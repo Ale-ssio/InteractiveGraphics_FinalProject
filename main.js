@@ -9,8 +9,8 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 // VARIABLES DECLARATION
 // Three.js main variables
 var scene, camera, renderer;
-// Loader for 3D models, Orbit Controls, Gui Controls
-var loader, controls, guiControls, datGUI;
+// Loader for 3D models, Controls, Gui Controls
+var loader, controls, datGUI, keysPressed = {};
 // Helpers
 var axes, grid, dLightHelper, cannonDebugger;
 // Lights
@@ -26,6 +26,8 @@ var floorPhysMat, floorBody;
 var bulletGeo, bulletMat, bulletMesh, bullets = [];
 // Bullets Body
 var bulletPhysMat, bulletBody;
+// Cylinder
+var cylinderGeo, cylinderMat, cylinderMesh, cylinderPhysMat, cylinderBody;
 
 // Call the main function
 init();
@@ -46,7 +48,7 @@ function init() {
         1000
     );
         // Setting the position
-    camera.position.set(0, 2, 20);
+    camera.position.set(0, 2, 30);
         // Looking at the origin of the scene
     camera.lookAt(0, 2, 0);
 
@@ -61,7 +63,7 @@ function init() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     //===================================================================
-    // SETTING ORBIT CONTROLS
+    // SETTING CONTROLS
     
     controls = new OrbitControls(camera, renderer.domElement);
         // Parameters
@@ -181,17 +183,30 @@ function init() {
     floorBody.quaternion.setFromEuler(-.5*Math.PI, 0, 0);
     world.addBody(floorBody);
 
-    //===================================================================
-    // CONTACT BETWEEN TWO MATERIALS
-    /*
-    var floorCylinderContactMat = new CANNON.ContactMaterial(
-        floorPhysMat,
-        cylinderPhysMat,
-        {rstitution: 0.9}
-    );
+    // CYLINDER IN THREE JS
+    cylinderGeo = new THREE.CylinderGeometry(0.5, 0.5, 2, 32);
+    cylinderMat = new THREE.MeshBasicMaterial({
+        color: 0xff00ff,
+        //wireframe: true
+    });
+    cylinderMesh = new THREE.Mesh(cylinderGeo, cylinderMat);
+    cylinderMesh.castShadow = true;
+    cylinderMesh.receiveShadow = true;
+    scene.add(cylinderMesh);
+    // BODY FOR THE CYLINDER (PHYSIC CYLINDER)
+    cylinderPhysMat = new CANNON.Material();
 
-    world.addContactMaterial(floorCylinderContactMat);
-    */
+    cylinderBody = new CANNON.Body({
+        mass: 1,
+        shape: new CANNON.Cylinder(0.5, 0.5, 2, 32),
+        position: new CANNON.Vec3(-2, 10, 0),
+        material: cylinderPhysMat
+    });
+    world.addBody(cylinderBody);
+
+    // Air resistance
+    cylinderBody.linearDamping = 0.5; // [0, 1]
+    
     //===================================================================
     // RENDERING THE SCENE
 
@@ -243,6 +258,9 @@ function updatePhysics() {
         bullet.mesh.position.copy(bullet.body.position);
         bullet.mesh.quaternion.copy(bullet.body.quaternion);
     });
+
+    cylinderMesh.position.copy(cylinderBody.position);
+    cylinderMesh.quaternion.copy(cylinderBody.quaternion);
 }
 
 //===================================================================
@@ -260,7 +278,7 @@ window.addEventListener('resize', function() {
 function shootBullet() {
     
     // BULLET IN THREE.JS
-    bulletGeo = new THREE.SphereGeometry(0.1, 8, 8);
+    bulletGeo = new THREE.SphereGeometry(0.2, 8, 8);
     bulletMat = new THREE.MeshStandardMaterial({
         color: 0xffffff
     });
@@ -274,19 +292,19 @@ function shootBullet() {
     bulletPhysMat = new CANNON.Material();
 
     bulletBody = new CANNON.Body({
-        mass: 1,
-        shape: new CANNON.Sphere(0.1),
+        mass: 20,
+        shape: new CANNON.Sphere(0.2),
         position: new CANNON.Vec3(
             camera.position.x,
             camera.position.y,
-            camera.position.z
+            camera.position.z + 50
         ),
         material: bulletPhysMat
     });
         // Air resistance
     bulletBody.linearDamping = 0.2;
         // Rotation
-    bulletBody.angularVelocity.set(5, 5, 5);
+    bulletBody.angularVelocity.set(1, 1, 1);
     bulletBody.angularDamping = 0.5;
         // Velocity
     bulletBody.velocity.set(0, 0, -200);
