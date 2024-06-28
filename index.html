@@ -3,11 +3,26 @@
     <head>
         <meta charset="utf-8">
         <title>Shoot the Cans!</title>
-        <style> body {margin: 0; overflow: hidden;} </style>
+        <style> 
+            body {margin: 0; overflow: hidden;} 
+            #crosshair {
+                position: absolute;
+                top: 53%;
+                left: 50%;
+                width: 15px;
+                height: 15px;
+                background: transparent;
+                border: 1px solid red;
+                border-radius: 50%;
+                transform: translate(-50%, -50%);
+                pointer-events: none;
+            }
+        </style>
 
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     </head>
     <body>
+        <div id="crosshair"></div>
         <div id="container"></div>
         <script type="module" src="main.js"></script>
     </body>
