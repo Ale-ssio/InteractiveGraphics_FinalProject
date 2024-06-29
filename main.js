@@ -11,12 +11,16 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 var scene, camera, renderer;
 var player = {height: 1.8, speed: 0.2, turnSpeed: Math.PI * 0.01};
 // Loader for 3D models, Controls, Gui Controls
-var loader, controls, datGUI, keyboard = {};
+var loader, loadingManager, controls, datGUI, keyboard = {};
+// Raycaster
+var mouse, raycaster, intersects, intersectedObject, pickableObjects = [];
+var selected;
 // Helpers
-var axes, grid, dLightHelper, cannonDebugger;
+// var axes, grid, dLightHelper, cannonDebugger;
 // Lights
 var ambientLight, directionalLight;
 var ambientLightFolder, directionalLightFolder;
+var gunLight;
 // Physic World
 var world, timeStep;
 // Floor
@@ -35,6 +39,21 @@ var cylinderPhysMat, cylinderBody;
 var boxGeo, boxMat, boxMesh;
 // Box Body
 var boxPhysMat, boxBody;
+// Gun box
+var gunBoxGeo, gunBoxMat, gunBoxMesh;
+
+// Loading screen
+var RESOURCES_LOADED = false;
+
+var loadingScreen = {
+    scene: new THREE.Scene(),
+    camera: new THREE.PerspectiveCamera(
+        75, 
+        window.innerWidth / window.innerHeight,
+        0.1,
+        100
+    )
+}
 
 // Call the main function
 init();
@@ -69,6 +88,10 @@ function init() {
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
+    // Raycaster
+    mouse = new THREE.Vector2();
+    raycaster = new THREE.Raycaster();
+
     //===================================================================
     // SETTING CONTROLS
     
@@ -89,18 +112,18 @@ function init() {
     // ADDING HELPERS
 
     // Visualize cartesian axes
-    axes = new THREE.AxesHelper(2);
-    scene.add(axes);
+    // axes = new THREE.AxesHelper(2);
+    // scene.add(axes);
 
     // Visualize a grid on the floor
-    grid = new THREE.GridHelper(100, 10);
-    scene.add(grid);
+    // grid = new THREE.GridHelper(100, 10);
+    // scene.add(grid);
 
     //===================================================================
     // SETTING THE LIGHTS
 
     // Ambient Light
-    ambientLight = new THREE.AmbientLight(0x555555)
+    ambientLight = new THREE.AmbientLight(0x555555, 2)
     scene.add(ambientLight);
 
     // Directional Light
@@ -120,8 +143,13 @@ function init() {
     scene.add(directionalLight);
 
     // Helper to see light direction
-    dLightHelper = new THREE.DirectionalLightHelper(directionalLight, 5);
-    scene.add(dLightHelper);
+    // dLightHelper = new THREE.DirectionalLightHelper(directionalLight, 5);
+    // scene.add(dLightHelper);
+
+    gunLight = new THREE.RectAreaLight(0xffffff, 10, 5, 10);
+    gunLight.position.set(20, 5, 0);
+    gunLight.lookAt(20, 0, 0);
+    scene.add(gunLight);
 
     //===================================================================
     // ADDING CONTROLS FOR THE LIGHTS
@@ -172,7 +200,7 @@ function init() {
     //===================================================================
     // CANNON-ES-DEBUGGER
 
-    cannonDebugger = new CannonDebugger(scene, world);
+    // cannonDebugger = new CannonDebugger(scene, world);
 
     //===================================================================
     // BUILDING A BODY FOR THE FLOOR
@@ -192,7 +220,7 @@ function init() {
 
     //===================================================================
     // CYLINDER IN THREE JS
-    cylinderGeo = new THREE.CylinderGeometry(0.5, 0.5, 2, 32);
+    cylinderGeo = new THREE.CylinderGeometry(0.5, 0.5, 2, 12);
     cylinderMat = new THREE.MeshStandardMaterial({
         color: 0xff00ff,
         //wireframe: true
@@ -206,7 +234,7 @@ function init() {
 
     cylinderBody = new CANNON.Body({
         mass: 1,
-        shape: new CANNON.Cylinder(0.5, 0.5, 2, 32),
+        shape: new CANNON.Cylinder(0.5, 0.5, 2, 12),
         position: new CANNON.Vec3(-2, 10, 0),
         material: cylinderPhysMat
     });
@@ -223,6 +251,8 @@ function init() {
         //wireframe: true
     });
     boxMesh = new THREE.Mesh(boxGeo, boxMat);
+    boxMesh.castShadow = true;
+    boxMesh.receiveShadow = true;
     scene.add(boxMesh);
     // BODY FOR THE BOX (PHYSIC BOX)
     boxPhysMat = new CANNON.Material();
@@ -241,6 +271,29 @@ function init() {
     // Rotation of the body
     boxBody.angularVelocity.set(0, 10, 0);
     boxBody.angularDamping = 0.5;
+
+    //===================================================================
+    // LOADING OBJECTS
+
+    loadingManager = new THREE.LoadingManager();
+
+    loadingManager.onProgress = function(item, loaded, total) {
+        console.log(item, loaded, total);
+    }
+
+    loadingManager.onLoad = function() {
+        console.log("All resources loaded.");
+        RESOURCES_LOADED = true;
+    }
+
+    loader = new GLTFLoader(loadingManager);
+    loadGuns();
+
+    //===================================================================
+    // RAYCASTER
+
+    raycaster = new THREE.Raycaster();
+    mouse = new THREE.Vector2();
     
     //===================================================================
     // RENDERING THE SCENE
@@ -272,10 +325,56 @@ window.addEventListener('keydown', function(event) {
     keyboard[event.code] = true;
 });
 
+// Raycaster Listener
+window.addEventListener('click', onMouseClick, false);
+
+function onMouseClick(event) {
+
+    // Calculate mouse position in normalized device coordinates (-1 to +1)
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    // Update the raycaster with the camera and mouse position
+    raycaster.setFromCamera(mouse, camera);
+
+    // Calculate objects intersecting the picking ray
+    intersects = raycaster.intersectObjects(pickableObjects, true);
+
+    // Reset the position of all pickable objects
+    pickableObjects.forEach(obj => {
+        if (obj != selected) obj.position.y = 1
+    });
+
+    // If there's an intersection, raise the selected object
+    if (intersects.length > 0) {
+        let intersectedObject = intersects[0].object;
+
+        // Traverse up to the top-level parent of the intersected object
+        while (intersectedObject.parent && intersectedObject.parent.type !== 'Scene') {
+            intersectedObject = intersectedObject.parent;
+        }
+        console.log(intersectedObject.name);
+        if (intersectedObject != selected) {
+            intersectedObject.position.y += 1;
+            selected = intersectedObject;
+            pickableObjects.forEach(obj => {
+                if (obj != selected) obj.position.y = 1
+            });
+        }
+    }
+}
+
 //===================================================================
 // ANIMATE FUNCTION
 
 function animate() {
+
+    if (RESOURCES_LOADED == false) {
+        requestAnimationFrame(animate);
+        renderer.render(loadingScreen.scene, loadingScreen.camera);
+        return;
+    }
+
     // Loop and keep things up to date
     requestAnimationFrame(animate);
     // Time between updates
@@ -286,7 +385,11 @@ function animate() {
     //controls.update();
     playerMovement();
     // Update cannon-es-debugger
-    cannonDebugger.update();
+    // cannonDebugger.update();
+    // Rotate guns
+    pickableObjects.forEach( (gun) => {
+        gun.rotation.y += 0.01;
+    });
     // Actually render the scene
     renderer.render(scene, camera);
 }
@@ -355,12 +458,152 @@ function playerMovement() {
 }
 
 //===================================================================
+// GUNS LOADING FUNCTION
+
+function loadGuns() {
+
+    gunBoxGeo = new THREE.BoxGeometry(2, 0.3, 2);
+    gunBoxMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        //wireframe: true
+    });
+
+    loader.load('models/bigGun.gltf', function(gltf) {
+        var gun = gltf.scene;
+        gun.traverse((child) => {
+            if (child.isMesh) {
+                child.castshadow = true;
+                child.receiveShadow = true;
+            }
+        });
+        pickableObjects.push(gun);
+        gun.position.set(20, 1, -5);
+        gun.scale.set(2, 2, 2);
+        gun.name = 'bigGun';
+        scene.add(gun);
+    }, undefined, function(error) {
+        console.error(error);
+    });
+
+    gunBoxMesh = new THREE.Mesh(gunBoxGeo, gunBoxMat);
+    gunBoxMesh.castShadow = true;
+    gunBoxMesh.receiveShadow = true;
+    gunBoxMesh.position.set(20, 0.5, -5);
+    scene.add(gunBoxMesh);
+
+    loader.load('models/mediumGun.gltf', function(gltf) {
+        var gun = gltf.scene;
+        gun.traverse((child) => {
+            if (child.isMesh) {
+                child.castshadow = true;
+                child.receiveShadow = true;
+            }
+        });
+        pickableObjects.push(gun);
+        gun.position.set(20, 1, 0);
+        gun.scale.set(2, 2, 2);
+        gun.name = 'mediumGun';
+        scene.add(gun);
+    }, undefined, function(error) {
+        console.error(error);
+    });
+
+    gunBoxMesh = new THREE.Mesh(gunBoxGeo, gunBoxMat);
+    gunBoxMesh.castShadow = true;
+    gunBoxMesh.receiveShadow = true;
+    gunBoxMesh.position.set(20, 0.5, 0);
+    scene.add(gunBoxMesh);
+
+    loader.load('models/littleGun.gltf', function(gltf) {
+        var gun = gltf.scene;
+        gun.traverse((child) => {
+            if (child.isMesh) {
+                child.castshadow = true;
+                child.receiveShadow = true;
+            }
+        });
+        pickableObjects.push(gun);
+        gun.position.set(20, 2, 5);
+        gun.scale.set(2, 2, 2);
+        gun.name = 'littleGun';
+        selected = gun;
+        scene.add(gun);
+    }, undefined, function(error) {
+        console.error(error);
+    });
+
+    gunBoxMesh = new THREE.Mesh(gunBoxGeo, gunBoxMat);
+    gunBoxMesh.castShadow = true;
+    gunBoxMesh.receiveShadow = true;
+    gunBoxMesh.position.set(20, 0.5, 5);
+    scene.add(gunBoxMesh);
+
+}
+
+//===================================================================
 // SHOOTING FUNCTION
 
 function shootBullet() {
+
+    switch(selected.name) {
+        case 'bigGun':
+            bulletGeo = new THREE.SphereGeometry(1, 8, 8);
+
+            bulletBody = new CANNON.Body({
+                mass: 10,
+                shape: new CANNON.Sphere(1),
+                position: new CANNON.Vec3(
+                    camera.position.x, //meshes["gun"].position.x
+                    camera.position.y,
+                    camera.position.z
+                ),
+                material: bulletPhysMat
+            });
+            break;
+        case 'mediumGun':
+            bulletGeo = new THREE.SphereGeometry(0.5, 8, 8);
+
+            bulletBody = new CANNON.Body({
+                mass: 10,
+                shape: new CANNON.Sphere(0.5),
+                position: new CANNON.Vec3(
+                    camera.position.x, //meshes["gun"].position.x
+                    camera.position.y,
+                    camera.position.z
+                ),
+                material: bulletPhysMat
+            });
+            break;
+        case 'littleGun':
+            bulletGeo = new THREE.SphereGeometry(0.1, 8, 8);
+
+            bulletBody = new CANNON.Body({
+                mass: 10,
+                shape: new CANNON.Sphere(0.1),
+                position: new CANNON.Vec3(
+                    camera.position.x, //meshes["gun"].position.x
+                    camera.position.y,
+                    camera.position.z
+                ),
+                material: bulletPhysMat
+            });
+            break;
+        default:
+            bulletGeo = new THREE.SphereGeometry(0.1, 8, 8);
+
+            bulletBody = new CANNON.Body({
+                mass: 10,
+                shape: new CANNON.Sphere(0.1),
+                position: new CANNON.Vec3(
+                    camera.position.x, //meshes["gun"].position.x
+                    camera.position.y,
+                    camera.position.z
+                ),
+                material: bulletPhysMat
+            });
+    }
     
     // BULLET IN THREE.JS
-    bulletGeo = new THREE.SphereGeometry(0.2, 8, 8);
     bulletMat = new THREE.MeshStandardMaterial({
         color: 0xffffff
     });
@@ -372,17 +615,6 @@ function shootBullet() {
 
     // BULLET BODY
     bulletPhysMat = new CANNON.Material();
-
-    bulletBody = new CANNON.Body({
-        mass: 10,
-        shape: new CANNON.Sphere(0.2),
-        position: new CANNON.Vec3(
-            camera.position.x, //meshes["gun"].position.x
-            camera.position.y,
-            camera.position.z
-        ),
-        material: bulletPhysMat
-    });
         // Air resistance
     bulletBody.linearDamping = 0.2;
         // Rotation
