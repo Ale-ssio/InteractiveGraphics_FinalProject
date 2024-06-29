@@ -9,8 +9,9 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 // VARIABLES DECLARATION
 // Three.js main variables
 var scene, camera, renderer;
+var player = {height: 1.8, speed: 0.2, turnSpeed: Math.PI * 0.01};
 // Loader for 3D models, Controls, Gui Controls
-var loader, controls, datGUI, keysPressed = {};
+var loader, controls, datGUI, keyboard = {};
 // Helpers
 var axes, grid, dLightHelper, cannonDebugger;
 // Lights
@@ -27,7 +28,13 @@ var bulletGeo, bulletMat, bulletMesh, bullets = [];
 // Bullets Body
 var bulletPhysMat, bulletBody;
 // Cylinder
-var cylinderGeo, cylinderMat, cylinderMesh, cylinderPhysMat, cylinderBody;
+var cylinderGeo, cylinderMat, cylinderMesh;
+// Cylinder Body
+var cylinderPhysMat, cylinderBody;
+// Box
+var boxGeo, boxMat, boxMesh;
+// Box Body
+var boxPhysMat, boxBody;
 
 // Call the main function
 init();
@@ -48,9 +55,9 @@ function init() {
         1000
     );
         // Setting the position
-    camera.position.set(0, 2, 30);
+    camera.position.set(0, player.height, 30);
         // Looking at the origin of the scene
-    camera.lookAt(0, 2, 0);
+    camera.lookAt(0, player.height, 0);
 
     // Renderer
     renderer = new THREE.WebGLRenderer({antialias: false});
@@ -183,9 +190,10 @@ function init() {
     floorBody.quaternion.setFromEuler(-.5*Math.PI, 0, 0);
     world.addBody(floorBody);
 
+    //===================================================================
     // CYLINDER IN THREE JS
     cylinderGeo = new THREE.CylinderGeometry(0.5, 0.5, 2, 32);
-    cylinderMat = new THREE.MeshBasicMaterial({
+    cylinderMat = new THREE.MeshStandardMaterial({
         color: 0xff00ff,
         //wireframe: true
     });
@@ -206,6 +214,33 @@ function init() {
 
     // Air resistance
     cylinderBody.linearDamping = 0.5; // [0, 1]
+
+    // ==============================================================
+    // BOX IN THREE JS
+    boxGeo = new THREE.BoxGeometry(2, 2, 2);
+    boxMat = new THREE.MeshBasicMaterial({
+        color: 0xf0f0f0,
+        //wireframe: true
+    });
+    boxMesh = new THREE.Mesh(boxGeo, boxMat);
+    scene.add(boxMesh);
+    // BODY FOR THE BOX (PHYSIC BOX)
+    boxPhysMat = new CANNON.Material();
+
+    boxBody = new CANNON.Body({
+        mass: 10,
+        shape: new CANNON.Box(new CANNON.Vec3(1, 1, 1)),
+        position: new CANNON.Vec3(2, 10, 0),
+        material: boxPhysMat
+    });
+    world.addBody(boxBody);
+
+    // Air resistance
+    boxBody.linearDamping = 0.1; // [0, 1]
+
+    // Rotation of the body
+    boxBody.angularVelocity.set(0, 10, 0);
+    boxBody.angularDamping = 0.5;
     
     //===================================================================
     // RENDERING THE SCENE
@@ -223,9 +258,18 @@ function init() {
 }
 
 //===================================================================
-// SHOOT LISTENER
+// KEYS LISTENER
 window.addEventListener('keyup', function(event) {
+    // Shooting case
     if (event.code === 'Space') shootBullet();
+    else {
+        keyboard[event.code] = false;
+    }
+});
+
+window.addEventListener('keydown', function(event) {
+    // This key is pressed
+    keyboard[event.code] = true;
 });
 
 //===================================================================
@@ -239,7 +283,8 @@ function animate() {
     // Update position and quaternion of objects w.r.t their body
     updatePhysics();
     // Update controls
-    controls.update();
+    //controls.update();
+    playerMovement();
     // Update cannon-es-debugger
     cannonDebugger.update();
     // Actually render the scene
@@ -261,6 +306,9 @@ function updatePhysics() {
 
     cylinderMesh.position.copy(cylinderBody.position);
     cylinderMesh.quaternion.copy(cylinderBody.quaternion);
+
+    boxMesh.position.copy(boxBody.position);
+    boxMesh.quaternion.copy(boxBody.quaternion);
 }
 
 //===================================================================
@@ -271,6 +319,40 @@ window.addEventListener('resize', function() {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+//===================================================================
+// MOVEMENT FUNCTION
+
+function playerMovement() {
+    if (keyboard["ArrowLeft"]) { // Left arrow key
+        camera.rotation.y += player.turnSpeed;
+    }
+    if (keyboard["ArrowRight"]) { // Right arrow key
+        camera.rotation.y -= player.turnSpeed;
+    }
+    if (keyboard["ArrowUp"]) { // Up arrow key
+        camera.rotation.x += player.turnSpeed;
+    }
+    if (keyboard["ArrowDown"]) { // Down arrow key
+        camera.rotation.x -= player.turnSpeed;
+    }
+    if (keyboard["KeyW"]) { // W key
+        camera.position.x -= Math.sin(camera.rotation.y) * player.speed;
+        camera.position.z += -Math.cos(camera.rotation.y) * player.speed;
+    }
+    if (keyboard["KeyA"]) { // A key
+        camera.position.x -= Math.sin(camera.rotation.y + Math.PI/2) * player.speed;
+        camera.position.z += -Math.cos(camera.rotation.y + Math.PI/2) * player.speed;
+    }
+    if (keyboard["KeyS"]) { // S key
+        camera.position.x += Math.sin(camera.rotation.y) * player.speed;
+        camera.position.z -= -Math.cos(camera.rotation.y) * player.speed;
+    }
+    if (keyboard["KeyD"]) { // D key
+        camera.position.x -= Math.sin(camera.rotation.y - Math.PI/2) * player.speed;
+        camera.position.z += -Math.cos(camera.rotation.y - Math.PI/2) * player.speed;
+    }
+}
 
 //===================================================================
 // SHOOTING FUNCTION
@@ -292,12 +374,12 @@ function shootBullet() {
     bulletPhysMat = new CANNON.Material();
 
     bulletBody = new CANNON.Body({
-        mass: 20,
+        mass: 10,
         shape: new CANNON.Sphere(0.2),
         position: new CANNON.Vec3(
-            camera.position.x,
+            camera.position.x, //meshes["gun"].position.x
             camera.position.y,
-            camera.position.z + 50
+            camera.position.z
         ),
         material: bulletPhysMat
     });
@@ -307,9 +389,36 @@ function shootBullet() {
     bulletBody.angularVelocity.set(1, 1, 1);
     bulletBody.angularDamping = 0.5;
         // Velocity
-    bulletBody.velocity.set(0, 0, -200);
+    var direction = new THREE.Vector3();
+    camera.getWorldDirection(direction);
+    var velocity = new CANNON.Vec3(
+        direction.x, 
+        direction.y,
+        direction.z).scale(50);
+    bulletBody.velocity.set(
+        velocity.x, 
+        velocity.y, 
+        velocity.z);
     
     bullets.push({mesh: bulletMesh, body: bulletBody});
     
     world.addBody(bulletBody);
+
+    // ==============================================================
+    // CONTACT BETWEEN MATERIALS
+    const bulletBoxContactMat = new CANNON.ContactMaterial(
+        bulletPhysMat,
+        boxPhysMat,
+        {restitution: 0.9} // slippery
+    );
+
+    world.addContactMaterial(bulletBoxContactMat);
+
+    const bulletCylinderContactMat = new CANNON.ContactMaterial(
+        bulletPhysMat,
+        cylinderPhysMat,
+        {restitution: 0.9} // bouncy
+    );
+
+    world.addContactMaterial(bulletCylinderContactMat);
 }
