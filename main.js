@@ -56,7 +56,6 @@ var loadingScreen = {
     )
 }
 
-// Call the main function
 init();
 
 function init() {
@@ -336,6 +335,8 @@ window.addEventListener('click', onMouseClick, false);
 
 function onMouseClick(event) {
     event.preventDefault();  // Prevent default behavior
+
+    document.getElementById("tutorial").style.visibility = "hidden";
 
     // Calculate mouse position in normalized device coordinates (-1 to +1)
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
