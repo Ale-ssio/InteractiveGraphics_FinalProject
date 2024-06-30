@@ -3,26 +3,24 @@
     <head>
         <meta charset="utf-8">
         <title>Shoot the Cans!</title>
-        <style> 
-            body {margin: 0; overflow: hidden;} 
-            #crosshair {
-                position: absolute;
-                top: 53%;
-                left: 50%;
-                width: 15px;
-                height: 15px;
-                background: transparent;
-                border: 1px solid red;
-                border-radius: 50%;
-                transform: translate(-50%, -50%);
-                pointer-events: none;
-            }
-        </style>
+        <link rel="stylesheet" href="index.css"/>
 
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     </head>
     <body>
-        <div id="crosshair"></div>
+        <div id="crosshair-out">
+            <div id="crosshair-in"></div>
+        </div>
+        <div id="tutorial">
+            <p class="button">TUTORIAL</p>
+            <p>Move the player with <span class="button">WASD</span></p>
+            <p>Shoot with <span class="button">SPACE</span></p>
+            <p>You have <span class="button">10</span> bullets, no matter the gun</p>
+            <p>You can reload in any moment with <span class="button">R</span></p>
+            <p>To change the gun, <span class="button">click</span> on it with the mouse</p>
+            <p style="padding-top: 30px;">Click to exit</p>
+        </div>
+        <div id="reloading">RELOADING...</div>
         <div id="container"></div>
         <script type="module" src="main.js"></script>
     </body>
