@@ -305,6 +305,7 @@ function onMouseClick(event) {
     event.preventDefault();  // Prevent default behavior
 
     document.getElementById("tutorial").style.visibility = "hidden";
+    document.getElementById("pause").style.visibility = "hidden";
     document.body.requestPointerLock();
 
     // Calculate mouse position in normalized device coordinates (-1 to +1)
@@ -343,9 +344,9 @@ function onMouseClick(event) {
 
 // Rotation camera with mouse
 
-document.body.addEventListener( 'mousemove', ( event ) => {
+document.body.addEventListener('mousemove', (event) => {
 
-    if ( document.pointerLockElement === document.body ) {
+    if (document.pointerLockElement === document.body) {
 
         camera.rotation.y -= event.movementX / 500;
         camera.rotation.x -= event.movementY / 500;
@@ -353,6 +354,16 @@ document.body.addEventListener( 'mousemove', ( event ) => {
     }
 
 } );
+
+// Pause menu
+
+document.addEventListener('pointerlockchange', function() {
+    if (document.pointerLockElement === document.body) {
+        document.getElementById("pause").style.visibility = "hidden";
+    } else {
+        document.getElementById("pause").style.visibility = "visible";
+    }
+});
 
 //===================================================================
 // ANIMATE FUNCTION
