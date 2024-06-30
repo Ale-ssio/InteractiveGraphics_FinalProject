@@ -16,7 +16,7 @@ var loader, loadingManager, controls, datGUI, keyboard = {};
 var mouse, raycaster, intersects, intersectedObject, pickableObjects = [];
 var selected;
 // Helpers
-// var axes, grid, dLightHelper, cannonDebugger;
+var axes, grid, dLightHelper, cannonDebugger;
 // Lights
 var ambientLight, directionalLight;
 var ambientLightFolder, directionalLightFolder;
@@ -24,22 +24,16 @@ var gunLight;
 // Physic World
 var world, timeStep;
 // Floor
-var floorGeo, floorMat, floorMesh;
-// Floor Body
-var floorPhysMat, floorBody;
+var floorGeo, floorMat, floorMesh, floorPhysMat, floorBody;
+// Walls
+var wallGeo, wallMat, wall1Mesh, wall2Mesh, wall1Body, wall2Body;
 // Bullets
-var bulletGeo, bulletMat, bulletMesh, bullets = [];
+var bulletGeo, bulletMat, bulletMesh, bulletPhysMat, bulletBody, bullets = [];
 const MAX_BULLETS = 10;
-// Bullets Body
-var bulletPhysMat, bulletBody;
 // Cylinder
-var cylinderGeo, cylinderMat, cylinderMesh;
-// Cylinder Body
-var cylinderPhysMat, cylinderBody;
+var cylinderGeo, cylinderMat, cylinderMesh, cylinderPhysMat, cylinderBody;
 // Box
-var boxGeo, boxMat, boxMesh;
-// Box Body
-var boxPhysMat, boxBody;
+var boxGeo, boxMat, boxMesh, boxPhysMat, boxBody;
 // Gun box
 var gunBoxGeo, gunBoxMat, gunBoxMesh;
 
@@ -68,7 +62,7 @@ function init() {
 
     // Camera
     camera = new THREE.PerspectiveCamera(
-        45,
+        75,
         window.innerWidth / window.innerHeight,
         0.1,
         1000
@@ -77,6 +71,7 @@ function init() {
     camera.position.set(0, player.height, 30);
         // Looking at the origin of the scene
     camera.lookAt(0, player.height, 0);
+    camera.rotation.order = 'YXZ';
 
     // Renderer
     renderer = new THREE.WebGLRenderer({antialias: false});
@@ -172,22 +167,6 @@ function init() {
     directionalLightFolder.open();
 
     //===================================================================
-    // PLANE IN THREE.JS TO BUILD THE FLOOR
-
-    floorGeo = new THREE.PlaneGeometry(100, 100);
-    floorMat = new THREE.MeshPhongMaterial({
-        color: 0xffffff,
-        side: THREE.DoubleSide,
-        //wireframe: true
-    });
-        // Building the floor
-    floorMesh = new THREE.Mesh(floorGeo, floorMat);
-        // Shadows: the floor doesn't cast shadows, only receives
-    floorMesh.castShadow = false;
-    floorMesh.receiveShadow = true;
-    scene.add(floorMesh);
-
-    //===================================================================
     // INITIALIZING THE PHYSIC WORLD
 
     world = new CANNON.World({
@@ -195,28 +174,17 @@ function init() {
         gravity: new CANNON.Vec3(0, -9.82, 0)
     });
 
-    timeStep = 1 / 60;
+    timeStep = 1 / (60 * 1.5);
 
     //===================================================================
     // CANNON-ES-DEBUGGER
 
-    // cannonDebugger = new CannonDebugger(scene, world);
+    //cannonDebugger = new CannonDebugger(scene, world);
 
     //===================================================================
-    // BUILDING A BODY FOR THE FLOOR
+    // BUILDING THE SCENE
 
-        // Collisions depend on involved materials
-    floorPhysMat = new CANNON.Material();
-
-    floorBody = new CANNON.Body({
-        // Static, it has mass: 0
-        type: CANNON.Body.STATIC,
-        shape: new CANNON.Box(new CANNON.Vec3(100, 100, 0.01)),
-        material: floorPhysMat
-    });
-        // I need to rotate the plan to make it a floor
-    floorBody.quaternion.setFromEuler(-.5*Math.PI, 0, 0);
-    world.addBody(floorBody);
+    buildRoom();
 
     //===================================================================
     // CYLINDER IN THREE JS
@@ -337,13 +305,14 @@ function onMouseClick(event) {
     event.preventDefault();  // Prevent default behavior
 
     document.getElementById("tutorial").style.visibility = "hidden";
+    document.body.requestPointerLock();
 
     // Calculate mouse position in normalized device coordinates (-1 to +1)
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    //mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    //mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
     // Update the raycaster with the camera and mouse position
-    raycaster.setFromCamera(mouse, camera);
+    raycaster.set(camera.position, camera.getWorldDirection(new THREE.Vector3()));
 
     // Calculate objects intersecting the picking ray
     intersects = raycaster.intersectObjects(pickableObjects, true);
@@ -372,6 +341,19 @@ function onMouseClick(event) {
     }
 }
 
+// Rotation camera with mouse
+
+document.body.addEventListener( 'mousemove', ( event ) => {
+
+    if ( document.pointerLockElement === document.body ) {
+
+        camera.rotation.y -= event.movementX / 500;
+        camera.rotation.x -= event.movementY / 500;
+
+    }
+
+} );
+
 //===================================================================
 // ANIMATE FUNCTION
 
@@ -389,11 +371,10 @@ function animate() {
     world.step(timeStep);
     // Update position and quaternion of objects w.r.t their body
     updatePhysics();
-    // Update controls
-    //controls.update();
+    // Move the camera
     playerMovement();
     // Update cannon-es-debugger
-    // cannonDebugger.update();
+    //cannonDebugger.update();
     // Rotate guns
     pickableObjects.forEach( (gun) => {
         gun.rotation.y += 0.01;
@@ -435,18 +416,12 @@ window.addEventListener('resize', function() {
 // MOVEMENT FUNCTION
 
 function playerMovement() {
-    if (keyboard["ArrowLeft"]) { // Left arrow key
+    /*if (keyboard["ArrowLeft"]) { // Left arrow key
         camera.rotation.y += player.turnSpeed;
     }
     if (keyboard["ArrowRight"]) { // Right arrow key
         camera.rotation.y -= player.turnSpeed;
-    }
-    if (keyboard["ArrowUp"]) { // Up arrow key
-        camera.rotation.x += player.turnSpeed;
-    }
-    if (keyboard["ArrowDown"]) { // Down arrow key
-        camera.rotation.x -= player.turnSpeed;
-    }
+    }*/
     if (keyboard["KeyW"]) { // W key
         camera.position.x -= Math.sin(camera.rotation.y) * player.speed;
         camera.position.z += -Math.cos(camera.rotation.y) * player.speed;
@@ -463,6 +438,80 @@ function playerMovement() {
         camera.position.x -= Math.sin(camera.rotation.y - Math.PI/2) * player.speed;
         camera.position.z += -Math.cos(camera.rotation.y - Math.PI/2) * player.speed;
     }
+}
+
+//===================================================================
+// BUILDING ROOM FUNCTION
+
+function buildRoom() {
+
+    // Plane in Three.js to build the floor
+    floorGeo = new THREE.PlaneGeometry(100, 100);
+    floorMat = new THREE.MeshPhongMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+        //wireframe: true
+    });
+        // Building the floor
+    floorMesh = new THREE.Mesh(floorGeo, floorMat);
+        // Shadows: the floor doesn't cast shadows, only receives
+    floorMesh.castShadow = false;
+    floorMesh.receiveShadow = true;
+    scene.add(floorMesh);
+
+    // Body for the floor
+
+        // Collisions depend on involved materials
+    floorPhysMat = new CANNON.Material();
+
+    floorBody = new CANNON.Body({
+        // Static, it has mass: 0
+        type: CANNON.Body.STATIC,
+        shape: new CANNON.Box(new CANNON.Vec3(50, 50, 0.01)),
+        material: floorPhysMat
+    });
+        // I need to rotate the plan to make it a floor
+    floorBody.quaternion.setFromEuler(-.5*Math.PI, 0, 0);
+    world.addBody(floorBody);
+
+    // Walls
+    wallGeo = new THREE.PlaneGeometry(100, 30);
+    wallMat = new THREE.MeshPhongMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide
+    });
+
+    // First wall
+    wall1Mesh = new THREE.Mesh(wallGeo, wallMat);
+    wall1Mesh.position.set(0, 0, -50);
+    wall1Mesh.castShadow = false;
+    wall1Mesh.receiveShadow = true;
+    scene.add(wall1Mesh);
+
+    wall1Body = new CANNON.Body({
+        type: CANNON.Body.STATIC,
+        shape: new CANNON.Box(new CANNON.Vec3(50, 15, 0.2)),
+        material: floorPhysMat
+    });
+    wall1Body.position.set(0, 0, -50);
+    world.addBody(wall1Body);
+
+    // Second wall
+    wall2Mesh = new THREE.Mesh(wallGeo, wallMat);
+    wall2Mesh.position.set(50, 0, 0);
+    wall2Mesh.rotation.set(0, -.5*Math.PI, 0);
+    wall2Mesh.castShadow = false;
+    wall2Mesh.receiveShadow = true;
+    scene.add(wall2Mesh);
+
+    wall2Body = new CANNON.Body({
+        type: CANNON.Body.STATIC,
+        shape: new CANNON.Box(new CANNON.Vec3(50, 15, 0.2)),
+        material: floorPhysMat
+    });
+    wall2Body.quaternion.setFromEuler(0, -.5*Math.PI, 0);
+    wall2Body.position.set(50, 0, 0);
+    world.addBody(wall2Body);
 }
 
 //===================================================================
@@ -584,11 +633,11 @@ function shootBullet() {
                 });
                 break;
             case 'littleGun':
-                bulletGeo = new THREE.SphereGeometry(0.1, 8, 8);
+                bulletGeo = new THREE.SphereGeometry(0.2, 8, 8);
 
                 bulletBody = new CANNON.Body({
                     mass: 10,
-                    shape: new CANNON.Sphere(0.1),
+                    shape: new CANNON.Sphere(0.2),
                     position: new CANNON.Vec3(
                         camera.position.x, //meshes["gun"].position.x
                         camera.position.y,
@@ -598,11 +647,11 @@ function shootBullet() {
                 });
                 break;
             default:
-                bulletGeo = new THREE.SphereGeometry(0.1, 8, 8);
+                bulletGeo = new THREE.SphereGeometry(0.2, 8, 8);
 
                 bulletBody = new CANNON.Body({
                     mass: 10,
-                    shape: new CANNON.Sphere(0.1),
+                    shape: new CANNON.Sphere(0.2),
                     position: new CANNON.Vec3(
                         camera.position.x, //meshes["gun"].position.x
                         camera.position.y,
@@ -650,7 +699,7 @@ function shootBullet() {
         const bulletBoxContactMat = new CANNON.ContactMaterial(
             bulletPhysMat,
             boxPhysMat,
-            {restitution: 0.9} // slippery
+            {restitution: 0.5}
         );
 
         world.addContactMaterial(bulletBoxContactMat);
@@ -658,10 +707,18 @@ function shootBullet() {
         const bulletCylinderContactMat = new CANNON.ContactMaterial(
             bulletPhysMat,
             cylinderPhysMat,
-            {restitution: 0.9} // bouncy
+            {restitution: 0.5}
         );
 
         world.addContactMaterial(bulletCylinderContactMat);
+
+        const bulletWallContactMat = new CANNON.ContactMaterial(
+            bulletPhysMat,
+            floorPhysMat,
+            {restitution: 0.9}
+        );
+
+        world.addContactMaterial(bulletWallContactMat);
     }
 }
 
