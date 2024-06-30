@@ -29,6 +29,7 @@ var floorGeo, floorMat, floorMesh;
 var floorPhysMat, floorBody;
 // Bullets
 var bulletGeo, bulletMat, bulletMesh, bullets = [];
+const MAX_BULLETS = 10;
 // Bullets Body
 var bulletPhysMat, bulletBody;
 // Cylinder
@@ -94,7 +95,7 @@ function init() {
 
     //===================================================================
     // SETTING CONTROLS
-    
+    /*
     controls = new OrbitControls(camera, renderer.domElement);
         // Parameters
     controls.enableDamping = true;
@@ -107,7 +108,7 @@ function init() {
         RIGHT: THREE.MOUSE.LEFT
     }
     controls.update();
-
+    */
     //===================================================================
     // ADDING HELPERS
 
@@ -174,9 +175,9 @@ function init() {
     //===================================================================
     // PLANE IN THREE.JS TO BUILD THE FLOOR
 
-    floorGeo = new THREE.PlaneGeometry(1000, 1000);
+    floorGeo = new THREE.PlaneGeometry(100, 100);
     floorMat = new THREE.MeshPhongMaterial({
-        color: 0x555555,
+        color: 0xffffff,
         side: THREE.DoubleSide,
         //wireframe: true
     });
@@ -211,7 +212,7 @@ function init() {
     floorBody = new CANNON.Body({
         // Static, it has mass: 0
         type: CANNON.Body.STATIC,
-        shape: new CANNON.Box(new CANNON.Vec3(1000, 1000, 0.01)),
+        shape: new CANNON.Box(new CANNON.Vec3(100, 100, 0.01)),
         material: floorPhysMat
     });
         // I need to rotate the plan to make it a floor
@@ -247,7 +248,7 @@ function init() {
     // BOX IN THREE JS
     boxGeo = new THREE.BoxGeometry(2, 2, 2);
     boxMat = new THREE.MeshBasicMaterial({
-        color: 0xf0f0f0,
+        color: 0x00ffff,
         //wireframe: true
     });
     boxMesh = new THREE.Mesh(boxGeo, boxMat);
@@ -315,6 +316,11 @@ function init() {
 window.addEventListener('keyup', function(event) {
     // Shooting case
     if (event.code === 'Space') shootBullet();
+    else if (event.code === 'KeyR') {
+        document.getElementById('reloading').style.visibility = "visible";
+        setTimeout(reloadGuns, 1000);
+        //reloadGuns();
+    }
     else {
         keyboard[event.code] = false;
     }
@@ -329,6 +335,7 @@ window.addEventListener('keydown', function(event) {
 window.addEventListener('click', onMouseClick, false);
 
 function onMouseClick(event) {
+    event.preventDefault();  // Prevent default behavior
 
     // Calculate mouse position in normalized device coordinates (-1 to +1)
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -347,13 +354,13 @@ function onMouseClick(event) {
 
     // If there's an intersection, raise the selected object
     if (intersects.length > 0) {
-        let intersectedObject = intersects[0].object;
+        intersectedObject = intersects[0].object;
 
         // Traverse up to the top-level parent of the intersected object
         while (intersectedObject.parent && intersectedObject.parent.type !== 'Scene') {
             intersectedObject = intersectedObject.parent;
         }
-        console.log(intersectedObject.name);
+        //console.log(intersectedObject.name);
         if (intersectedObject != selected) {
             intersectedObject.position.y += 1;
             selected = intersectedObject;
@@ -464,7 +471,7 @@ function loadGuns() {
 
     gunBoxGeo = new THREE.BoxGeometry(2, 0.3, 2);
     gunBoxMat = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
+        color: 0xffc000,
         //wireframe: true
     });
 
@@ -488,7 +495,7 @@ function loadGuns() {
     gunBoxMesh = new THREE.Mesh(gunBoxGeo, gunBoxMat);
     gunBoxMesh.castShadow = true;
     gunBoxMesh.receiveShadow = true;
-    gunBoxMesh.position.set(20, 0.5, -5);
+    gunBoxMesh.position.set(20, 0.2, -5);
     scene.add(gunBoxMesh);
 
     loader.load('models/mediumGun.gltf', function(gltf) {
@@ -511,7 +518,7 @@ function loadGuns() {
     gunBoxMesh = new THREE.Mesh(gunBoxGeo, gunBoxMat);
     gunBoxMesh.castShadow = true;
     gunBoxMesh.receiveShadow = true;
-    gunBoxMesh.position.set(20, 0.5, 0);
+    gunBoxMesh.position.set(20, 0.2, 0);
     scene.add(gunBoxMesh);
 
     loader.load('models/littleGun.gltf', function(gltf) {
@@ -535,7 +542,7 @@ function loadGuns() {
     gunBoxMesh = new THREE.Mesh(gunBoxGeo, gunBoxMat);
     gunBoxMesh.castShadow = true;
     gunBoxMesh.receiveShadow = true;
-    gunBoxMesh.position.set(20, 0.5, 5);
+    gunBoxMesh.position.set(20, 0.2, 5);
     scene.add(gunBoxMesh);
 
 }
@@ -545,112 +552,122 @@ function loadGuns() {
 
 function shootBullet() {
 
-    switch(selected.name) {
-        case 'bigGun':
-            bulletGeo = new THREE.SphereGeometry(1, 8, 8);
+    if (bullets.length < MAX_BULLETS) {
+        switch(selected.name) {
+            case 'bigGun':
+                bulletGeo = new THREE.SphereGeometry(1, 8, 8);
 
-            bulletBody = new CANNON.Body({
-                mass: 10,
-                shape: new CANNON.Sphere(1),
-                position: new CANNON.Vec3(
-                    camera.position.x, //meshes["gun"].position.x
-                    camera.position.y,
-                    camera.position.z
-                ),
-                material: bulletPhysMat
-            });
-            break;
-        case 'mediumGun':
-            bulletGeo = new THREE.SphereGeometry(0.5, 8, 8);
+                bulletBody = new CANNON.Body({
+                    mass: 10,
+                    shape: new CANNON.Sphere(1),
+                    position: new CANNON.Vec3(
+                        camera.position.x, //meshes["gun"].position.x
+                        camera.position.y,
+                        camera.position.z
+                    ),
+                    material: bulletPhysMat
+                });
+                break;
+            case 'mediumGun':
+                bulletGeo = new THREE.SphereGeometry(0.5, 8, 8);
 
-            bulletBody = new CANNON.Body({
-                mass: 10,
-                shape: new CANNON.Sphere(0.5),
-                position: new CANNON.Vec3(
-                    camera.position.x, //meshes["gun"].position.x
-                    camera.position.y,
-                    camera.position.z
-                ),
-                material: bulletPhysMat
-            });
-            break;
-        case 'littleGun':
-            bulletGeo = new THREE.SphereGeometry(0.1, 8, 8);
+                bulletBody = new CANNON.Body({
+                    mass: 10,
+                    shape: new CANNON.Sphere(0.5),
+                    position: new CANNON.Vec3(
+                        camera.position.x, //meshes["gun"].position.x
+                        camera.position.y,
+                        camera.position.z
+                    ),
+                    material: bulletPhysMat
+                });
+                break;
+            case 'littleGun':
+                bulletGeo = new THREE.SphereGeometry(0.1, 8, 8);
 
-            bulletBody = new CANNON.Body({
-                mass: 10,
-                shape: new CANNON.Sphere(0.1),
-                position: new CANNON.Vec3(
-                    camera.position.x, //meshes["gun"].position.x
-                    camera.position.y,
-                    camera.position.z
-                ),
-                material: bulletPhysMat
-            });
-            break;
-        default:
-            bulletGeo = new THREE.SphereGeometry(0.1, 8, 8);
+                bulletBody = new CANNON.Body({
+                    mass: 10,
+                    shape: new CANNON.Sphere(0.1),
+                    position: new CANNON.Vec3(
+                        camera.position.x, //meshes["gun"].position.x
+                        camera.position.y,
+                        camera.position.z
+                    ),
+                    material: bulletPhysMat
+                });
+                break;
+            default:
+                bulletGeo = new THREE.SphereGeometry(0.1, 8, 8);
 
-            bulletBody = new CANNON.Body({
-                mass: 10,
-                shape: new CANNON.Sphere(0.1),
-                position: new CANNON.Vec3(
-                    camera.position.x, //meshes["gun"].position.x
-                    camera.position.y,
-                    camera.position.z
-                ),
-                material: bulletPhysMat
-            });
+                bulletBody = new CANNON.Body({
+                    mass: 10,
+                    shape: new CANNON.Sphere(0.1),
+                    position: new CANNON.Vec3(
+                        camera.position.x, //meshes["gun"].position.x
+                        camera.position.y,
+                        camera.position.z
+                    ),
+                    material: bulletPhysMat
+                });
+        }
+        
+        // BULLET IN THREE.JS
+        bulletMat = new THREE.MeshStandardMaterial({
+            color: 0xffc000
+        });
+        bulletMesh = new THREE.Mesh(bulletGeo, bulletMat);
+        bulletMesh.castShadow = true;
+        bulletMesh.receiveShadow = true;
+
+        scene.add(bulletMesh);
+
+        // BULLET BODY
+        bulletPhysMat = new CANNON.Material();
+            // Air resistance
+        bulletBody.linearDamping = 0.2;
+            // Velocity
+        var direction = new THREE.Vector3();
+        camera.getWorldDirection(direction);
+        var velocity = new CANNON.Vec3(
+            direction.x, 
+            direction.y,
+            direction.z).scale(50);
+        bulletBody.velocity.set(
+            velocity.x, 
+            velocity.y, 
+            velocity.z);
+        
+        bullets.push({mesh: bulletMesh, body: bulletBody});
+        
+        world.addBody(bulletBody);
+
+        // ==============================================================
+        // CONTACT BETWEEN MATERIALS
+        const bulletBoxContactMat = new CANNON.ContactMaterial(
+            bulletPhysMat,
+            boxPhysMat,
+            {restitution: 0.9} // slippery
+        );
+
+        world.addContactMaterial(bulletBoxContactMat);
+
+        const bulletCylinderContactMat = new CANNON.ContactMaterial(
+            bulletPhysMat,
+            cylinderPhysMat,
+            {restitution: 0.9} // bouncy
+        );
+
+        world.addContactMaterial(bulletCylinderContactMat);
     }
-    
-    // BULLET IN THREE.JS
-    bulletMat = new THREE.MeshStandardMaterial({
-        color: 0xffffff
-    });
-    bulletMesh = new THREE.Mesh(bulletGeo, bulletMat);
-    bulletMesh.castShadow = true;
-    bulletMesh.receiveShadow = true;
+}
 
-    scene.add(bulletMesh);
-
-    // BULLET BODY
-    bulletPhysMat = new CANNON.Material();
-        // Air resistance
-    bulletBody.linearDamping = 0.2;
-        // Rotation
-    bulletBody.angularVelocity.set(1, 1, 1);
-    bulletBody.angularDamping = 0.5;
-        // Velocity
-    var direction = new THREE.Vector3();
-    camera.getWorldDirection(direction);
-    var velocity = new CANNON.Vec3(
-        direction.x, 
-        direction.y,
-        direction.z).scale(50);
-    bulletBody.velocity.set(
-        velocity.x, 
-        velocity.y, 
-        velocity.z);
-    
-    bullets.push({mesh: bulletMesh, body: bulletBody});
-    
-    world.addBody(bulletBody);
-
-    // ==============================================================
-    // CONTACT BETWEEN MATERIALS
-    const bulletBoxContactMat = new CANNON.ContactMaterial(
-        bulletPhysMat,
-        boxPhysMat,
-        {restitution: 0.9} // slippery
-    );
-
-    world.addContactMaterial(bulletBoxContactMat);
-
-    const bulletCylinderContactMat = new CANNON.ContactMaterial(
-        bulletPhysMat,
-        cylinderPhysMat,
-        {restitution: 0.9} // bouncy
-    );
-
-    world.addContactMaterial(bulletCylinderContactMat);
+//===================================================================
+// RELOADING FUNCTION
+function reloadGuns() {
+    while (bullets.length > 0) {
+        let b = bullets.pop();
+        scene.remove(b.mesh);
+        world.removeBody(b.body);
+    }
+    document.getElementById('reloading').style.visibility = "hidden";
 }
