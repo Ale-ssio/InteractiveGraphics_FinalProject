@@ -642,6 +642,9 @@ function shootBullet() {
         
         world.addBody(bulletBody);
 
+        // Bullets left
+        document.getElementById("bullets").innerHTML = 10 - bullets.length;
+
         // ==============================================================
         // CONTACT BETWEEN MATERIALS
         const bulletBoxContactMat = new CANNON.ContactMaterial(
@@ -671,4 +674,5 @@ function reloadGuns() {
         world.removeBody(b.body);
     }
     document.getElementById('reloading').style.visibility = "hidden";
+    document.getElementById("bullets").innerHTML = 10;
 }
