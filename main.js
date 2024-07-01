@@ -312,7 +312,27 @@ function onMouseClick(event) {
                 if (obj != selected) obj.position.y = 1
             });
         }
+
+        switch(selected.name) {
+            case 'littleGun':
+                document.getElementById("pistol").style.visibility = "visible";
+                document.getElementById("rifle").style.visibility = "hidden";
+                document.getElementById("grenade").style.visibility = "hidden";
+                break;
+            case 'mediumGun':
+                document.getElementById("pistol").style.visibility = "hidden";
+                document.getElementById("rifle").style.visibility = "visible";
+                document.getElementById("grenade").style.visibility = "hidden";
+                break;
+            case 'bigGun':
+                document.getElementById("pistol").style.visibility = "hidden";
+                document.getElementById("rifle").style.visibility = "hidden";
+                document.getElementById("grenade").style.visibility = "visible";
+                break;
+        }
+
     }
+
 }
 
 // Rotation camera with mouse
