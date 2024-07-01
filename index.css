@@ -54,6 +54,7 @@ body {
     color: white;
     background: transparent;
     backdrop-filter: blur(20px);
+    border-radius: 20%;
     border: 1px solid white;
     text-align: center;
     align-content: center;
@@ -65,12 +66,11 @@ body {
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 200px;
+    width: 500px;
     height: 250px;
     transform: translate(-50%, -50%);
     color: white;
-    background: transparent;
-    backdrop-filter: blur(20px);
+    background-color: black;
     border: 1px solid white;
     text-align: center;
     align-content: center;
@@ -80,11 +80,31 @@ body {
 
 #bullets {
     position: fixed;
-    bottom: 0;
-    right: 0;
+    bottom: 3%;
+    right: 3%;
     color: white;
     font-size: 40px;
     font-weight: bold;
+}
+
+#pistol {
+    position: fixed;
+    bottom: 4%;
+    right: 5%;
+}
+
+#rifle {
+    position: fixed;
+    bottom: 0;
+    right: 5%;
+    visibility: hidden;
+}
+
+#grenade {
+    position: fixed;
+    bottom: 2%;
+    right: 5%;
+    visibility: hidden;
 }
 
 .button {
