@@ -4,12 +4,13 @@ import * as dat from 'dat.gui';
 import CannonDebugger from 'cannon-es-debugger'
 import WebGL from 'three/examples/jsm/capabilities/WebGL.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 
 // VARIABLES DECLARATION
 // Three.js main variables
 var scene, camera, renderer;
-var player = {height: 1.8, speed: 0.2, turnSpeed: Math.PI * 0.01};
+var player = {height: 1.8, speed: 0.2, fast: 0, turnSpeed: Math.PI * 0.01, canJump: true, startJump: 0};
+var playerPhysMat, playerBody;
+var clock = new THREE.Clock();
 // Loader for 3D models, Controls, Gui Controls
 var loader, loadingManager, controls, datGUI, keyboard = {};
 // Raycaster
@@ -26,16 +27,18 @@ var world, timeStep;
 // Floor
 var floorGeo, floorMat, floorMesh, floorPhysMat, floorBody;
 // Walls
-var wallGeo, wallMat, wall1Mesh, wall2Mesh, wall1Body, wall2Body;
+var wallGeo, wallMat, wall1Mesh, wall2Mesh, wallPhysMat, wall1Body, wall2Body;
 // Bullets
 var bulletGeo, bulletMat, bulletMesh, bulletPhysMat, bulletBody, bullets = [];
 const MAX_BULLETS = 10;
-// Cylinder
-var cylinderGeo, cylinderMat, cylinderMesh, cylinderPhysMat, cylinderBody;
-// Box
-var boxGeo, boxMat, boxMesh, boxPhysMat, boxBody;
+// Robot\
+var robotMesh, robotPhysMat, robotBody;
 // Gun box
 var gunBoxGeo, gunBoxMat, gunBoxMesh;
+// Collisions groups
+var GROUP_OBJECTS = 1;
+var GROUP_BULLETS = 2;
+var GROUP_PLAYER = 4;
 
 // Loading screen
 var RESOURCES_LOADED = false;
@@ -141,9 +144,9 @@ function init() {
     // dLightHelper = new THREE.DirectionalLightHelper(directionalLight, 5);
     // scene.add(dLightHelper);
 
-    gunLight = new THREE.RectAreaLight(0xffffff, 10, 5, 10);
-    gunLight.position.set(20, 5, 0);
-    gunLight.lookAt(20, 0, 0);
+    gunLight = new THREE.RectAreaLight(0xffffff, 10, 6, 10);
+    gunLight.position.set(40, 5, 0);
+    gunLight.lookAt(40, 0, 0);
     scene.add(gunLight);
 
     //===================================================================
@@ -185,60 +188,33 @@ function init() {
     // BUILDING THE SCENE
 
     buildRoom();
+    buildObstacles();
 
     //===================================================================
-    // CYLINDER IN THREE JS
-    cylinderGeo = new THREE.CylinderGeometry(0.5, 0.5, 2, 12);
-    cylinderMat = new THREE.MeshStandardMaterial({
-        color: 0xff00ff,
-        //wireframe: true
+    // BODY OF THE PLAYER
+
+    playerPhysMat = new CANNON.Material();
+
+    playerBody = new CANNON.Body({
+        mass: 70,
+        shape: new CANNON.Box(new CANNON.Vec3(0.5, 1, 0.5)),
+        position: new CANNON.Vec3(camera.position.x, 2, camera.position.z),
+        material: playerPhysMat,
+        collisionFilterGroup: GROUP_PLAYER,
+        collisionFilterMask: GROUP_OBJECTS
     });
-    cylinderMesh = new THREE.Mesh(cylinderGeo, cylinderMat);
-    cylinderMesh.castShadow = true;
-    cylinderMesh.receiveShadow = true;
-    scene.add(cylinderMesh);
-    // BODY FOR THE CYLINDER (PHYSIC CYLINDER)
-    cylinderPhysMat = new CANNON.Material();
+    playerBody.fixedRotation = true;
+    playerBody.updateMassProperties();
+    world.addBody(playerBody);
 
-    cylinderBody = new CANNON.Body({
-        mass: 1,
-        shape: new CANNON.Cylinder(0.5, 0.5, 2, 12),
-        position: new CANNON.Vec3(-2, 10, 0),
-        material: cylinderPhysMat
-    });
-    world.addBody(cylinderBody);
+    const playerFloorContactMat = new CANNON.ContactMaterial(
+        playerPhysMat,
+        floorPhysMat,
+        {restitution: 0},
+        {friction: 0}
+    );
 
-    // Air resistance
-    cylinderBody.linearDamping = 0.5; // [0, 1]
-
-    // ==============================================================
-    // BOX IN THREE JS
-    boxGeo = new THREE.BoxGeometry(2, 2, 2);
-    boxMat = new THREE.MeshBasicMaterial({
-        color: 0x00ffff,
-        //wireframe: true
-    });
-    boxMesh = new THREE.Mesh(boxGeo, boxMat);
-    boxMesh.castShadow = true;
-    boxMesh.receiveShadow = true;
-    scene.add(boxMesh);
-    // BODY FOR THE BOX (PHYSIC BOX)
-    boxPhysMat = new CANNON.Material();
-
-    boxBody = new CANNON.Body({
-        mass: 10,
-        shape: new CANNON.Box(new CANNON.Vec3(1, 1, 1)),
-        position: new CANNON.Vec3(2, 10, 0),
-        material: boxPhysMat
-    });
-    world.addBody(boxBody);
-
-    // Air resistance
-    boxBody.linearDamping = 0.1; // [0, 1]
-
-    // Rotation of the body
-    boxBody.angularVelocity.set(0, 10, 0);
-    boxBody.angularDamping = 0.5;
+    world.addContactMaterial(playerFloorContactMat);
 
     //===================================================================
     // LOADING OBJECTS
@@ -255,13 +231,10 @@ function init() {
     }
 
     loader = new GLTFLoader(loadingManager);
+
     loadGuns();
 
-    //===================================================================
-    // RAYCASTER
-
-    raycaster = new THREE.Raycaster();
-    mouse = new THREE.Vector2();
+    spawnEnemy();
     
     //===================================================================
     // RENDERING THE SCENE
@@ -333,7 +306,7 @@ function onMouseClick(event) {
         }
         //console.log(intersectedObject.name);
         if (intersectedObject != selected) {
-            intersectedObject.position.y += 1;
+            intersectedObject.position.y += 2;
             selected = intersectedObject;
             pickableObjects.forEach(obj => {
                 if (obj != selected) obj.position.y = 1
@@ -398,20 +371,16 @@ function animate() {
 // UPDATE PHYSICS FUNCTION
 
 function updatePhysics() {
-    // Floor
-    floorMesh.position.copy(floorBody.position);
-    floorMesh.quaternion.copy(floorBody.quaternion);
     // Bullets
     bullets.forEach((bullet) => {
         bullet.mesh.position.copy(bullet.body.position);
         bullet.mesh.quaternion.copy(bullet.body.quaternion);
     });
-
-    cylinderMesh.position.copy(cylinderBody.position);
-    cylinderMesh.quaternion.copy(cylinderBody.quaternion);
-
-    boxMesh.position.copy(boxBody.position);
-    boxMesh.quaternion.copy(boxBody.quaternion);
+    // Camera
+    camera.position.copy(playerBody.position);
+    // Robot
+    robotMesh.position.copy(robotBody.position);
+    robotMesh.quaternion.copy(robotBody.quaternion);
 }
 
 //===================================================================
@@ -427,27 +396,47 @@ window.addEventListener('resize', function() {
 // MOVEMENT FUNCTION
 
 function playerMovement() {
-    /*if (keyboard["ArrowLeft"]) { // Left arrow key
-        camera.rotation.y += player.turnSpeed;
+    player.fast = 0;
+    if (keyboard["KeyE"] && player.canJump) { // E key
+        player.startJump = playerBody.position.y;
+        player.fast = player.speed;
+        if (keyboard["ShiftLeft"] || keyboard["ShiftRight"]) player.fast *= 2;
+        playerBody.velocity.y = 30;
+        player.canJump = false;
     }
-    if (keyboard["ArrowRight"]) { // Right arrow key
-        camera.rotation.y -= player.turnSpeed;
-    }*/
     if (keyboard["KeyW"]) { // W key
-        camera.position.x -= Math.sin(camera.rotation.y) * player.speed;
-        camera.position.z += -Math.cos(camera.rotation.y) * player.speed;
+        player.fast = player.speed;
+        if (keyboard["ShiftLeft"] || keyboard["ShiftRight"]) player.fast *= 2;
+        playerBody.position.x -= Math.sin(camera.rotation.y) * player.fast;
+        playerBody.position.z += -Math.cos(camera.rotation.y) * player.fast;
     }
     if (keyboard["KeyA"]) { // A key
-        camera.position.x -= Math.sin(camera.rotation.y + Math.PI/2) * player.speed;
-        camera.position.z += -Math.cos(camera.rotation.y + Math.PI/2) * player.speed;
+        player.fast = player.speed;
+        if (keyboard["ShiftLeft"] || keyboard["ShiftRight"]) player.fast *= 2;
+        playerBody.position.x -= Math.sin(camera.rotation.y + Math.PI/2) * player.fast;
+        playerBody.position.z += -Math.cos(camera.rotation.y + Math.PI/2) * player.fast;
     }
     if (keyboard["KeyS"]) { // S key
-        camera.position.x += Math.sin(camera.rotation.y) * player.speed;
-        camera.position.z -= -Math.cos(camera.rotation.y) * player.speed;
+        player.fast = player.speed;
+        if (keyboard["ShiftLeft"] || keyboard["ShiftRight"]) player.fast *= 2;
+        playerBody.position.x += Math.sin(camera.rotation.y) * player.fast;
+        playerBody.position.z -= -Math.cos(camera.rotation.y) * player.fast;
     }
     if (keyboard["KeyD"]) { // D key
-        camera.position.x -= Math.sin(camera.rotation.y - Math.PI/2) * player.speed;
-        camera.position.z += -Math.cos(camera.rotation.y - Math.PI/2) * player.speed;
+        player.fast = player.speed;
+        if (keyboard["ShiftLeft"] || keyboard["ShiftRight"]) player.fast *= 2;
+        playerBody.position.x -= Math.sin(camera.rotation.y - Math.PI/2) * player.fast;
+        playerBody.position.z += -Math.cos(camera.rotation.y - Math.PI/2) * player.fast;
+    }
+    if (playerBody.position.y < -10) {
+        playerBody.position.set(0, 5, 30);
+    }
+    if (Math.abs(playerBody.velocity.y) < 0.1) {
+        player.canJump = true;
+        player.startJump = 0;
+    }
+    if (playerBody.position.y - player.startJump >= 6) {
+        playerBody.velocity.y = -10;
     }
 }
 
@@ -465,6 +454,7 @@ function buildRoom() {
     });
         // Building the floor
     floorMesh = new THREE.Mesh(floorGeo, floorMat);
+    floorMesh.rotation.set(-.5*Math.PI, 0, 0);
         // Shadows: the floor doesn't cast shadows, only receives
     floorMesh.castShadow = false;
     floorMesh.receiveShadow = true;
@@ -478,38 +468,45 @@ function buildRoom() {
     floorBody = new CANNON.Body({
         // Static, it has mass: 0
         type: CANNON.Body.STATIC,
-        shape: new CANNON.Box(new CANNON.Vec3(50, 50, 0.01)),
-        material: floorPhysMat
+        shape: new CANNON.Box(new CANNON.Vec3(50, 50, 1)),
+        material: floorPhysMat,
+        collisionFilterGroup: GROUP_OBJECTS,
+        collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
     });
         // I need to rotate the plan to make it a floor
     floorBody.quaternion.setFromEuler(-.5*Math.PI, 0, 0);
+    floorBody.position.set(0, -1, 0);
     world.addBody(floorBody);
 
     // Walls
-    wallGeo = new THREE.PlaneGeometry(100, 30);
+    wallGeo = new THREE.PlaneGeometry(100, 20);
     wallMat = new THREE.MeshPhongMaterial({
         color: 0xffffff,
         side: THREE.DoubleSide
     });
 
+    wallPhysMat = new CANNON.Material();
+
     // First wall
     wall1Mesh = new THREE.Mesh(wallGeo, wallMat);
-    wall1Mesh.position.set(0, 0, -50);
+    wall1Mesh.position.set(0, 10, -50);
     wall1Mesh.castShadow = false;
     wall1Mesh.receiveShadow = true;
     scene.add(wall1Mesh);
 
     wall1Body = new CANNON.Body({
         type: CANNON.Body.STATIC,
-        shape: new CANNON.Box(new CANNON.Vec3(50, 15, 0.2)),
-        material: floorPhysMat
+        shape: new CANNON.Box(new CANNON.Vec3(50, 10, 1)),
+        material: wallPhysMat,
+        collisionFilterGroup: GROUP_OBJECTS,
+        collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
     });
-    wall1Body.position.set(0, 0, -50);
+    wall1Body.position.set(0, 10, -51);
     world.addBody(wall1Body);
 
     // Second wall
     wall2Mesh = new THREE.Mesh(wallGeo, wallMat);
-    wall2Mesh.position.set(50, 0, 0);
+    wall2Mesh.position.set(50, 10, 0);
     wall2Mesh.rotation.set(0, -.5*Math.PI, 0);
     wall2Mesh.castShadow = false;
     wall2Mesh.receiveShadow = true;
@@ -517,13 +514,84 @@ function buildRoom() {
 
     wall2Body = new CANNON.Body({
         type: CANNON.Body.STATIC,
-        shape: new CANNON.Box(new CANNON.Vec3(50, 15, 0.2)),
-        material: floorPhysMat
+        shape: new CANNON.Box(new CANNON.Vec3(50, 10, 1)),
+        material: wallPhysMat,
+        collisionFilterGroup: GROUP_OBJECTS,
+        collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
     });
     wall2Body.quaternion.setFromEuler(0, -.5*Math.PI, 0);
-    wall2Body.position.set(50, 0, 0);
+    wall2Body.position.set(51, 10, 0);
     world.addBody(wall2Body);
 }
+
+//===================================================================
+// OBSTACLES BUILDING FUNCTION
+
+function buildObstacles() {
+    var buildPoss, obsHeight;
+    for (let i = -48; i <= -4; i += 6) {
+        for (let j = -48; j <= 48; j += 6) {
+            buildPoss = Math.random();
+            if (buildPoss > 0.8) {
+                obsHeight = Math.random() * 10;
+                var boxGeo = new THREE.BoxGeometry(3, obsHeight, 3);
+                var boxMat = new THREE.MeshBasicMaterial({
+                    color: 0xffffff
+                });
+                var boxMesh = new THREE.Mesh(boxGeo, boxMat);
+                boxMesh.position.set(i, 0, j);
+                boxMesh.castShadow = true;
+                boxMesh.receiveShadow = true;
+                scene.add(boxMesh);
+
+                // BODY FOR THE BOX (PHYSIC BOX)
+                var boxBody = new CANNON.Body({
+                    type: CANNON.Body.STATIC,
+                    shape: new CANNON.Box(new CANNON.Vec3(1.5, obsHeight/2, 1.5)),
+                    position: new CANNON.Vec3(i, 0, j),
+                    material: wallPhysMat,
+                    collisionFilterGroup: GROUP_OBJECTS,
+                    collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
+                });
+                world.addBody(boxBody);
+            }
+        }
+    }
+}
+
+//===================================================================
+// ENEMY SPAWN FUNCTION
+
+function spawnEnemy() {
+    loader.load('models/botDrone.gltf', function(gltf) {
+        robotMesh = gltf.scene;
+        robotMesh.traverse((child) => {
+            if (child.isMesh) {
+                child.castshadow = true;
+                child.receiveShadow = true;
+            }
+        });
+        robotMesh.scale.set(2, 2, 2);
+        robotMesh.name = 'robot';
+        scene.add(robotMesh);
+    }, undefined, function(error) {
+        console.error(error);
+    });
+
+    robotPhysMat = new CANNON.Material();
+
+    robotBody = new CANNON.Body({
+        mass: 20,
+        shape: new CANNON.Sphere(3),
+        position: new CANNON.Vec3(0, 5, 0),
+        material: robotPhysMat
+    });
+    robotBody.quaternion.setFromEuler(0, .7*Math.PI, 0);
+    world.addBody(robotBody);
+
+    // Air resistance
+    robotBody.linearDamping = 0.2; // [0, 1]
+    }
 
 //===================================================================
 // GUNS LOADING FUNCTION
@@ -545,8 +613,8 @@ function loadGuns() {
             }
         });
         pickableObjects.push(gun);
-        gun.position.set(20, 1, -5);
-        gun.scale.set(2, 2, 2);
+        gun.position.set(40, 1, -5);
+        gun.scale.set(3, 3, 3);
         gun.name = 'bigGun';
         scene.add(gun);
     }, undefined, function(error) {
@@ -556,7 +624,7 @@ function loadGuns() {
     gunBoxMesh = new THREE.Mesh(gunBoxGeo, gunBoxMat);
     gunBoxMesh.castShadow = true;
     gunBoxMesh.receiveShadow = true;
-    gunBoxMesh.position.set(20, 0.2, -5);
+    gunBoxMesh.position.set(40, 0.2, -5);
     scene.add(gunBoxMesh);
 
     loader.load('models/mediumGun.gltf', function(gltf) {
@@ -568,8 +636,8 @@ function loadGuns() {
             }
         });
         pickableObjects.push(gun);
-        gun.position.set(20, 1, 0);
-        gun.scale.set(2, 2, 2);
+        gun.position.set(40, 1, 0);
+        gun.scale.set(3, 3, 3);
         gun.name = 'mediumGun';
         scene.add(gun);
     }, undefined, function(error) {
@@ -579,7 +647,7 @@ function loadGuns() {
     gunBoxMesh = new THREE.Mesh(gunBoxGeo, gunBoxMat);
     gunBoxMesh.castShadow = true;
     gunBoxMesh.receiveShadow = true;
-    gunBoxMesh.position.set(20, 0.2, 0);
+    gunBoxMesh.position.set(40, 0.2, 0);
     scene.add(gunBoxMesh);
 
     loader.load('models/littleGun.gltf', function(gltf) {
@@ -591,8 +659,8 @@ function loadGuns() {
             }
         });
         pickableObjects.push(gun);
-        gun.position.set(20, 2, 5);
-        gun.scale.set(2, 2, 2);
+        gun.position.set(40, 3, 5);
+        gun.scale.set(3, 3, 3);
         gun.name = 'littleGun';
         selected = gun;
         scene.add(gun);
@@ -603,7 +671,7 @@ function loadGuns() {
     gunBoxMesh = new THREE.Mesh(gunBoxGeo, gunBoxMat);
     gunBoxMesh.castShadow = true;
     gunBoxMesh.receiveShadow = true;
-    gunBoxMesh.position.set(20, 0.2, 5);
+    gunBoxMesh.position.set(40, 0.2, 5);
     scene.add(gunBoxMesh);
 
 }
@@ -626,7 +694,9 @@ function shootBullet() {
                         camera.position.y,
                         camera.position.z
                     ),
-                    material: bulletPhysMat
+                    material: bulletPhysMat,
+                    collisionFilterGroup: GROUP_BULLETS,
+                    collisionFilterMask: GROUP_OBJECTS | GROUP_BULLETS
                 });
                 break;
             case 'mediumGun':
@@ -640,7 +710,9 @@ function shootBullet() {
                         camera.position.y,
                         camera.position.z
                     ),
-                    material: bulletPhysMat
+                    material: bulletPhysMat,
+                    collisionFilterGroup: GROUP_BULLETS,
+                    collisionFilterMask: GROUP_OBJECTS | GROUP_BULLETS
                 });
                 break;
             case 'littleGun':
@@ -654,7 +726,9 @@ function shootBullet() {
                         camera.position.y,
                         camera.position.z
                     ),
-                    material: bulletPhysMat
+                    material: bulletPhysMat,
+                    collisionFilterGroup: GROUP_BULLETS,
+                    collisionFilterMask: GROUP_OBJECTS | GROUP_BULLETS
                 });
                 break;
             default:
@@ -668,7 +742,9 @@ function shootBullet() {
                         camera.position.y,
                         camera.position.z
                     ),
-                    material: bulletPhysMat
+                    material: bulletPhysMat,
+                    collisionFilterGroup: GROUP_BULLETS,
+                    collisionFilterMask: GROUP_OBJECTS | GROUP_BULLETS
                 });
         }
         
@@ -692,7 +768,7 @@ function shootBullet() {
         var velocity = new CANNON.Vec3(
             direction.x, 
             direction.y,
-            direction.z).scale(50);
+            direction.z).scale(50 + player.fast);
         bulletBody.velocity.set(
             velocity.x, 
             velocity.y, 
@@ -707,26 +783,19 @@ function shootBullet() {
 
         // ==============================================================
         // CONTACT BETWEEN MATERIALS
-        const bulletBoxContactMat = new CANNON.ContactMaterial(
+
+        const bulletFloorContactMat = new CANNON.ContactMaterial(
             bulletPhysMat,
-            boxPhysMat,
+            floorPhysMat,
             {restitution: 0.5}
         );
 
-        world.addContactMaterial(bulletBoxContactMat);
-
-        const bulletCylinderContactMat = new CANNON.ContactMaterial(
-            bulletPhysMat,
-            cylinderPhysMat,
-            {restitution: 0.5}
-        );
-
-        world.addContactMaterial(bulletCylinderContactMat);
+        world.addContactMaterial(bulletFloorContactMat);
 
         const bulletWallContactMat = new CANNON.ContactMaterial(
             bulletPhysMat,
-            floorPhysMat,
-            {restitution: 0.9}
+            wallPhysMat,
+            {restitution: 0.5}
         );
 
         world.addContactMaterial(bulletWallContactMat);
