@@ -38,8 +38,10 @@ var robot = {vx: 0, vy: 0, vz: 0, rx: 0, ry: 0, rz: 0};
 var obstacles = [];
 // Gun box
 var gunBoxGeo, gunBoxMat, gunBoxMesh;
-var medium_gun = {price: 1, bought: false, lock: null};
-var big_gun = {price: 2, bought: false, lock: null};
+var medium_gun = {price: 5, bought: false, lock: null, texture: null};
+var big_gun = {price: 20, bought: false, lock: null, texture: null};
+// Labels
+var labelGeo, labelMat, texture;
 // Collisions groups
 var GROUP_OBJECTS = 1;
 var GROUP_BULLETS = 2;
@@ -324,6 +326,7 @@ function onMouseClick(event) {
                         player.coins -= medium_gun.price;
                         document.getElementById("coins").innerHTML = player.coins;
                         scene.remove(medium_gun.lock);
+                        scene.remove(medium_gun.texture);
                         medium_gun.bought = true;
                     }
                     if (medium_gun.bought == true) {
@@ -342,6 +345,7 @@ function onMouseClick(event) {
                         player.coins -= big_gun.price;
                         document.getElementById("coins").innerHTML = player.coins;
                         scene.remove(big_gun.lock);
+                        scene.remove(big_gun.texture);
                         big_gun.bought = true;
                     }
                     if (big_gun.bought == true) {
@@ -679,6 +683,9 @@ function loadGuns() {
         //wireframe: true
     });
 
+    //=================================================
+    // BIG GUN
+
     loader.load('models/bigGun.gltf', function(gltf) {
         var gun = gltf.scene;
         gun.traverse((child) => {
@@ -718,6 +725,24 @@ function loadGuns() {
     gunBoxMesh.position.set(40, 0.2, -5);
     scene.add(gunBoxMesh);
 
+    labelGeo = new THREE.PlaneGeometry(4, 2);
+    texture = new THREE.TextureLoader(loadingManager).load('images/coins20.png');
+    labelMat = new THREE.MeshPhongMaterial({
+        color: 0x1ff2ff,
+        map: texture,
+        side: THREE.DoubleSide,
+        transparent: true
+    });
+    big_gun.texture = new THREE.Mesh(labelGeo, labelMat);
+    big_gun.texture.rotation.set(0, -.5*Math.PI, 0);
+    big_gun.texture.position.set(38.5, 5, -5);
+    big_gun.texture.castShadow = true;
+    big_gun.texture.receiveShadow = true;
+    scene.add(big_gun.texture);
+
+    //=================================================
+    // MEDIUM GUN
+
     loader.load('models/mediumGun.gltf', function(gltf) {
         var gun = gltf.scene;
         gun.traverse((child) => {
@@ -756,6 +781,24 @@ function loadGuns() {
     gunBoxMesh.receiveShadow = true;
     gunBoxMesh.position.set(40, 0.2, 0);
     scene.add(gunBoxMesh);
+
+    labelGeo = new THREE.PlaneGeometry(4, 2);
+    texture = new THREE.TextureLoader(loadingManager).load('images/coins5.png');
+    labelMat = new THREE.MeshPhongMaterial({
+        color: 0x1ff2ff,
+        map: texture,
+        side: THREE.DoubleSide,
+        transparent: true
+    });
+    medium_gun.texture = new THREE.Mesh(labelGeo, labelMat);
+    medium_gun.texture.rotation.set(0, -.5*Math.PI, 0);
+    medium_gun.texture.position.set(38.5, 5, 0);
+    medium_gun.texture.castShadow = true;
+    medium_gun.texture.receiveShadow = true;
+    scene.add(medium_gun.texture);
+
+    //=================================================
+    // LITTLE GUN
 
     loader.load('models/littleGun.gltf', function(gltf) {
         var gun = gltf.scene;
