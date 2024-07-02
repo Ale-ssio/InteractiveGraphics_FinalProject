@@ -8,7 +8,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 // VARIABLES DECLARATION
 // Three.js main variables
 var scene, camera, renderer;
-var player = {height: 1.8, speed: 0.2, fast: 0, turnSpeed: Math.PI * 0.01, canJump: true, startJump: 0};
+var player = {height: 1.8, speed: 0.2, fast: 0, turnSpeed: Math.PI * 0.01, canJump: true, startJump: 0, coins: 0};
 var playerPhysMat, playerBody;
 var clock = new THREE.Clock();
 // Loader for 3D models, Controls, Gui Controls
@@ -31,10 +31,15 @@ var wallGeo, wallMat, wall1Mesh, wall2Mesh, wallPhysMat, wall1Body, wall2Body;
 // Bullets
 var bulletGeo, bulletMat, bulletMesh, bulletPhysMat, bulletBody, bullets = [];
 const MAX_BULLETS = 10;
-// Robot\
+// Robot
 var robotMesh, robotPhysMat, robotBody;
+var robot = {vx: 0, vy: 0, vz: 0, rx: 0, ry: 0, rz: 0};
+// Obstacles
+var obstacles = [];
 // Gun box
 var gunBoxGeo, gunBoxMat, gunBoxMesh;
+var medium_gun = {price: 1, bought: false, lock: null};
+var big_gun = {price: 2, bought: false, lock: null};
 // Collisions groups
 var GROUP_OBJECTS = 1;
 var GROUP_BULLETS = 2;
@@ -281,10 +286,6 @@ function onMouseClick(event) {
     document.getElementById("pause").style.visibility = "hidden";
     document.body.requestPointerLock();
 
-    // Calculate mouse position in normalized device coordinates (-1 to +1)
-    //mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    //mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
     // Update the raycaster with the camera and mouse position
     raycaster.set(camera.position, camera.getWorldDirection(new THREE.Vector3()));
 
@@ -306,29 +307,55 @@ function onMouseClick(event) {
         }
         //console.log(intersectedObject.name);
         if (intersectedObject != selected) {
-            intersectedObject.position.y += 2;
-            selected = intersectedObject;
-            pickableObjects.forEach(obj => {
-                if (obj != selected) obj.position.y = 1
-            });
-        }
 
-        switch(selected.name) {
-            case 'littleGun':
-                document.getElementById("pistol").style.visibility = "visible";
-                document.getElementById("rifle").style.visibility = "hidden";
-                document.getElementById("grenade").style.visibility = "hidden";
-                break;
-            case 'mediumGun':
-                document.getElementById("pistol").style.visibility = "hidden";
-                document.getElementById("rifle").style.visibility = "visible";
-                document.getElementById("grenade").style.visibility = "hidden";
-                break;
-            case 'bigGun':
-                document.getElementById("pistol").style.visibility = "hidden";
-                document.getElementById("rifle").style.visibility = "hidden";
-                document.getElementById("grenade").style.visibility = "visible";
-                break;
+            switch(intersectedObject.name) {
+                case 'littleGun':
+                    document.getElementById("pistol").style.visibility = "visible";
+                    document.getElementById("rifle").style.visibility = "hidden";
+                    document.getElementById("grenade").style.visibility = "hidden";
+                    intersectedObject.position.y += 2;
+                    selected = intersectedObject;
+                    pickableObjects.forEach(obj => {
+                        if (obj != selected) obj.position.y = 1;
+                    });
+                    break;
+                case 'mediumGun':
+                    if (medium_gun.bought == false && player.coins >= medium_gun.price) {
+                        player.coins -= medium_gun.price;
+                        document.getElementById("coins").innerHTML = player.coins;
+                        scene.remove(medium_gun.lock);
+                        medium_gun.bought = true;
+                    }
+                    if (medium_gun.bought == true) {
+                        document.getElementById("pistol").style.visibility = "hidden";
+                        document.getElementById("rifle").style.visibility = "visible";
+                        document.getElementById("grenade").style.visibility = "hidden";
+                        intersectedObject.position.y += 2;
+                        selected = intersectedObject;
+                        pickableObjects.forEach(obj => {
+                            if (obj != selected) obj.position.y = 1;
+                        });
+                    }
+                    break;
+                case 'bigGun':
+                    if (big_gun.bought == false && player.coins >= big_gun.price) {
+                        player.coins -= big_gun.price;
+                        document.getElementById("coins").innerHTML = player.coins;
+                        scene.remove(big_gun.lock);
+                        big_gun.bought = true;
+                    }
+                    if (big_gun.bought == true) {
+                        document.getElementById("pistol").style.visibility = "hidden";
+                        document.getElementById("rifle").style.visibility = "hidden";
+                        document.getElementById("grenade").style.visibility = "visible";
+                        intersectedObject.position.y += 2;
+                        selected = intersectedObject;
+                        pickableObjects.forEach(obj => {
+                            if (obj != selected) obj.position.y = 1;
+                        });
+                    }
+                    break;
+            }
         }
 
     }
@@ -377,6 +404,8 @@ function animate() {
     updatePhysics();
     // Move the camera
     playerMovement();
+    // Move the robot
+    robotMovement();
     // Update cannon-es-debugger
     //cannonDebugger.update();
     // Rotate guns
@@ -457,6 +486,30 @@ function playerMovement() {
     }
     if (playerBody.position.y - player.startJump >= 6) {
         playerBody.velocity.y = -10;
+    }
+}
+
+//===================================================================
+// MOVEMENT FUNCTION
+
+function robotMovement() {
+
+
+
+    if (robotBody.position.y < -10) {
+        scene.remove(robotMesh);
+        world.removeBody(robotBody);
+        player.coins += 1;
+        document.getElementById("coins").innerHTML = player.coins;
+        spawnEnemy();
+        playerBody.position.set(0, 5, 30);
+
+        while (obstacles.length > 0) {
+            let o = obstacles.pop();
+            scene.remove(o.mesh);
+            world.removeBody(o.body);
+        }
+        buildObstacles();
     }
 }
 
@@ -574,6 +627,8 @@ function buildObstacles() {
                     collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
                 });
                 world.addBody(boxBody);
+
+                obstacles.push({mesh: boxMesh, body: boxBody});
             }
         }
     }
@@ -641,6 +696,22 @@ function loadGuns() {
         console.error(error);
     });
 
+    loader.load('models/lock.gltf', function(gltf) {
+        big_gun.lock = gltf.scene;
+        big_gun.lock.traverse((child) => {
+            if (child.isMesh) {
+                child.castshadow = true;
+                child.receiveShadow = true;
+            }
+        });
+        big_gun.lock.position.set(40, 4, -5);
+        big_gun.lock.scale.set(3, 3, 3);
+        big_gun.lock.rotation.set(0, Math.PI, 0);
+        scene.add(big_gun.lock);
+    }, undefined, function(error) {
+        console.error(error);
+    });
+
     gunBoxMesh = new THREE.Mesh(gunBoxGeo, gunBoxMat);
     gunBoxMesh.castShadow = true;
     gunBoxMesh.receiveShadow = true;
@@ -660,6 +731,22 @@ function loadGuns() {
         gun.scale.set(3, 3, 3);
         gun.name = 'mediumGun';
         scene.add(gun);
+    }, undefined, function(error) {
+        console.error(error);
+    });
+
+    loader.load('models/lock.gltf', function(gltf) {
+        medium_gun.lock = gltf.scene;
+        medium_gun.lock.traverse((child) => {
+            if (child.isMesh) {
+                child.castshadow = true;
+                child.receiveShadow = true;
+            }
+        });
+        medium_gun.lock.position.set(40, 4, 0);
+        medium_gun.lock.scale.set(3, 3, 3);
+        medium_gun.lock.rotation.set(0, Math.PI, 0);
+        scene.add(medium_gun.lock);
     }, undefined, function(error) {
         console.error(error);
     });
@@ -707,7 +794,7 @@ function shootBullet() {
                 bulletGeo = new THREE.SphereGeometry(1, 8, 8);
 
                 bulletBody = new CANNON.Body({
-                    mass: 10,
+                    mass: 20,
                     shape: new CANNON.Sphere(1),
                     position: new CANNON.Vec3(
                         camera.position.x, //meshes["gun"].position.x
@@ -739,7 +826,7 @@ function shootBullet() {
                 bulletGeo = new THREE.SphereGeometry(0.2, 8, 8);
 
                 bulletBody = new CANNON.Body({
-                    mass: 10,
+                    mass: 5,
                     shape: new CANNON.Sphere(0.2),
                     position: new CANNON.Vec3(
                         camera.position.x, //meshes["gun"].position.x
