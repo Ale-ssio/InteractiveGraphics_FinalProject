@@ -34,6 +34,8 @@ const MAX_BULLETS = 10;
 // Robot
 var robotMesh, robotPhysMat, robotBody;
 var robot = {vx: 0, vy: 0, vz: 0, rx: 0, ry: 0, rz: 0};
+// Target
+var targetMesh, targetPhysMat, targetBody;
 // Obstacles
 var obstacles = [];
 // Gun box
@@ -41,7 +43,7 @@ var gunBoxGeo, gunBoxMat, gunBoxMesh;
 var medium_gun = {price: 5, bought: false, lock: null, texture: null};
 var big_gun = {price: 20, bought: false, lock: null, texture: null};
 // Labels
-var labelGeo, labelMat, texture;
+var labelGeo, labelMat, texture, shop, fight, training;
 // Collisions groups
 var GROUP_OBJECTS = 1;
 var GROUP_BULLETS = 2;
@@ -240,6 +242,8 @@ function init() {
     loader = new GLTFLoader(loadingManager);
 
     loadGuns();
+
+    loadTraining();
 
     spawnEnemy();
     
@@ -524,8 +528,10 @@ function buildRoom() {
 
     // Plane in Three.js to build the floor
     floorGeo = new THREE.PlaneGeometry(100, 100);
+    texture = new THREE.TextureLoader(loadingManager).load('images/floor.png');
     floorMat = new THREE.MeshPhongMaterial({
         color: 0xffffff,
+        map: texture,
         side: THREE.DoubleSide,
         //wireframe: true
     });
@@ -557,8 +563,10 @@ function buildRoom() {
 
     // Walls
     wallGeo = new THREE.PlaneGeometry(100, 20);
+    texture = new THREE.TextureLoader(loadingManager).load('images/wall.png');
     wallMat = new THREE.MeshPhongMaterial({
         color: 0xffffff,
+        map: texture,
         side: THREE.DoubleSide
     });
 
@@ -581,6 +589,20 @@ function buildRoom() {
     wall1Body.position.set(0, 10, -51);
     world.addBody(wall1Body);
 
+    labelGeo = new THREE.PlaneGeometry(15, 6);
+    texture = new THREE.TextureLoader(loadingManager).load('images/fight.png');
+    labelMat = new THREE.MeshPhongMaterial({
+        color: 0x00bdc8,
+        map: texture,
+        side: THREE.DoubleSide,
+        transparent: true
+    });
+    fight = new THREE.Mesh(labelGeo, labelMat);
+    fight.position.set(0, 12, -45);
+    fight.castShadow = false;
+    fight.receiveShadow = true;
+    scene.add(fight);
+
     // Second wall
     wall2Mesh = new THREE.Mesh(wallGeo, wallMat);
     wall2Mesh.position.set(50, 10, 0);
@@ -599,6 +621,38 @@ function buildRoom() {
     wall2Body.quaternion.setFromEuler(0, -.5*Math.PI, 0);
     wall2Body.position.set(51, 10, 0);
     world.addBody(wall2Body);
+
+    labelGeo = new THREE.PlaneGeometry(15, 6);
+    texture = new THREE.TextureLoader(loadingManager).load('images/shop.png');
+    labelMat = new THREE.MeshPhongMaterial({
+        color: 0x00bdc8,
+        map: texture,
+        side: THREE.DoubleSide,
+        transparent: true
+    });
+    shop = new THREE.Mesh(labelGeo, labelMat);
+    shop.rotation.set(0, -.5*Math.PI, 0);
+    shop.position.set(45, 12, 0);
+    shop.castShadow = false;
+    shop.receiveShadow = true;
+    scene.add(shop);
+
+    // Corner
+
+    labelGeo = new THREE.PlaneGeometry(25, 8);
+    texture = new THREE.TextureLoader(loadingManager).load('images/training.png');
+    labelMat = new THREE.MeshPhongMaterial({
+        color: 0x00bdc8,
+        map: texture,
+        side: THREE.DoubleSide,
+        transparent: true
+    });
+    training = new THREE.Mesh(labelGeo, labelMat);
+    training.rotation.set(0, -.25*Math.PI, 0);
+    training.position.set(40, 10, -40);
+    training.castShadow = false;
+    training.receiveShadow = true;
+    scene.add(training);
 }
 
 //===================================================================
@@ -823,6 +877,42 @@ function loadGuns() {
     gunBoxMesh.receiveShadow = true;
     gunBoxMesh.position.set(40, 0.2, 5);
     scene.add(gunBoxMesh);
+
+}
+
+//===================================================================
+// LOADING TARGET FUNCTION
+
+function loadTraining() {
+
+    loader.load('models/target.gltf', function(gltf) {
+        targetMesh = gltf.scene;
+        targetMesh.traverse((child) => {
+            if (child.isMesh) {
+                child.castshadow = true;
+                child.receiveShadow = true;
+            }
+        });
+        targetMesh.scale.set(10, 10, 10);
+        targetMesh.position.set(40, -2, -40);
+        targetMesh.rotation.set(0, -.25*Math.PI, 0);
+        scene.add(targetMesh);
+    }, undefined, function(error) {
+        console.error(error);
+    });
+
+    targetPhysMat = new CANNON.Material();
+
+    targetBody = new CANNON.Body({
+        type: CANNON.Body.STATIC,
+        shape: new CANNON.Box(new CANNON.Vec3(2.5, 2.5, 1)),
+        position: new CANNON.Vec3(40.5, 2.5, -40),
+        material: robotPhysMat,
+        collisionFilterGroup: GROUP_OBJECTS,
+        collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
+    });
+    targetBody.quaternion.setFromEuler(0, -.25*Math.PI, 0);
+    world.addBody(targetBody);
 
 }
 
