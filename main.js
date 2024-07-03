@@ -149,6 +149,9 @@ function init() {
     directionalLight.shadow.camera.bottom = -100;
     scene.add(directionalLight);
 
+    //const helper = new THREE.CameraHelper(directionalLight.shadow.camera);
+    //scene.add(helper);
+
     // Helper to see light direction
     // dLightHelper = new THREE.DirectionalLightHelper(directionalLight, 5);
     // scene.add(dLightHelper);
@@ -249,6 +252,7 @@ function init() {
     
     //===================================================================
     // RENDERING THE SCENE
+    document.getElementById("coins").innerHTML = player.coins;
 
     // Displaying the scene adding a <canvas> element to the HTML
     document.body.appendChild(renderer.domElement);
@@ -370,6 +374,11 @@ function onMouseClick(event) {
 
 }
 
+// Don't request pointer lock if you click on dat GUI
+datGUI.domElement.addEventListener('click', function(event) {
+    event.stopPropagation();
+});
+
 // Rotation camera with mouse
 
 document.body.addEventListener('mousemove', (event) => {
@@ -378,6 +387,12 @@ document.body.addEventListener('mousemove', (event) => {
 
         camera.rotation.y -= event.movementX / 500;
         camera.rotation.x -= event.movementY / 500;
+
+        // Prevent flipping
+        const maxVerticalRotation = Math.PI / 2;
+        const minVerticalRotation = -Math.PI / 2;
+
+        camera.rotation.x = Math.max(minVerticalRotation, Math.min(maxVerticalRotation, camera.rotation.x));
 
     }
 
@@ -434,7 +449,9 @@ function updatePhysics() {
         bullet.mesh.quaternion.copy(bullet.body.quaternion);
     });
     // Camera
-    camera.position.copy(playerBody.position);
+    camera.position.x = playerBody.position.x;
+    camera.position.y = playerBody.position.y + 1;
+    camera.position.z = playerBody.position.z;
     // Robot
     robotMesh.position.copy(robotBody.position);
     robotMesh.quaternion.copy(robotBody.quaternion);
@@ -502,7 +519,11 @@ function playerMovement() {
 
 function robotMovement() {
 
+    if (robotBody.position.x < 0) {
+        var vx = Math.random() * 3;
 
+        robotBody.applyImpulse( new CANNON.Vec3(vx, 0, 0));
+    }
 
     if (robotBody.position.y < -10) {
         scene.remove(robotMesh);
@@ -670,7 +691,7 @@ function buildObstacles() {
                     color: 0xffffff
                 });
                 var boxMesh = new THREE.Mesh(boxGeo, boxMat);
-                boxMesh.position.set(i, 0, j);
+                boxMesh.position.set(i, obsHeight/2, j);
                 boxMesh.castShadow = true;
                 boxMesh.receiveShadow = true;
                 scene.add(boxMesh);
@@ -679,7 +700,7 @@ function buildObstacles() {
                 var boxBody = new CANNON.Body({
                     type: CANNON.Body.STATIC,
                     shape: new CANNON.Box(new CANNON.Vec3(1.5, obsHeight/2, 1.5)),
-                    position: new CANNON.Vec3(i, 0, j),
+                    position: new CANNON.Vec3(i, obsHeight/2, j),
                     material: wallPhysMat,
                     collisionFilterGroup: GROUP_OBJECTS,
                     collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
@@ -700,7 +721,7 @@ function spawnEnemy() {
         robotMesh = gltf.scene;
         robotMesh.traverse((child) => {
             if (child.isMesh) {
-                child.castshadow = true;
+                child.castShadow = true;
                 child.receiveShadow = true;
             }
         });
@@ -724,7 +745,7 @@ function spawnEnemy() {
 
     // Air resistance
     robotBody.linearDamping = 0.2; // [0, 1]
-    }
+}
 
 //===================================================================
 // GUNS LOADING FUNCTION
@@ -744,7 +765,7 @@ function loadGuns() {
         var gun = gltf.scene;
         gun.traverse((child) => {
             if (child.isMesh) {
-                child.castshadow = true;
+                child.castShadow = true;
                 child.receiveShadow = true;
             }
         });
@@ -761,7 +782,7 @@ function loadGuns() {
         big_gun.lock = gltf.scene;
         big_gun.lock.traverse((child) => {
             if (child.isMesh) {
-                child.castshadow = true;
+                child.castShadow = true;
                 child.receiveShadow = true;
             }
         });
@@ -801,7 +822,7 @@ function loadGuns() {
         var gun = gltf.scene;
         gun.traverse((child) => {
             if (child.isMesh) {
-                child.castshadow = true;
+                child.castShadow = true;
                 child.receiveShadow = true;
             }
         });
@@ -818,7 +839,7 @@ function loadGuns() {
         medium_gun.lock = gltf.scene;
         medium_gun.lock.traverse((child) => {
             if (child.isMesh) {
-                child.castshadow = true;
+                child.castShadow = true;
                 child.receiveShadow = true;
             }
         });
@@ -858,7 +879,7 @@ function loadGuns() {
         var gun = gltf.scene;
         gun.traverse((child) => {
             if (child.isMesh) {
-                child.castshadow = true;
+                child.castShadow = true;
                 child.receiveShadow = true;
             }
         });
@@ -889,7 +910,7 @@ function loadTraining() {
         targetMesh = gltf.scene;
         targetMesh.traverse((child) => {
             if (child.isMesh) {
-                child.castshadow = true;
+                child.castShadow = true;
                 child.receiveShadow = true;
             }
         });
@@ -975,7 +996,7 @@ function shootBullet() {
                 bulletGeo = new THREE.SphereGeometry(0.2, 8, 8);
 
                 bulletBody = new CANNON.Body({
-                    mass: 10,
+                    mass: 5,
                     shape: new CANNON.Sphere(0.2),
                     position: new CANNON.Vec3(
                         camera.position.x, //meshes["gun"].position.x
