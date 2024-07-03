@@ -8,7 +8,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 // VARIABLES DECLARATION
 // Three.js main variables
 var scene, camera, renderer;
-var player = {height: 1.8, speed: 0.2, fast: 0, turnSpeed: Math.PI * 0.01, canJump: true, startJump: 0, coins: 0};
+var player = {height: 1.8, speed: 0.2, fast: 0, turnSpeed: Math.PI * 0.01, canJump: true, startJump: 0, coins: 30};
 var playerPhysMat, playerBody;
 var clock = new THREE.Clock();
 // Loader for 3D models, Controls, Gui Controls
@@ -34,8 +34,9 @@ const MAX_BULLETS = 10;
 // Robot
 var robotMesh, robotPhysMat, robotBody;
 var robot = {vx: 0, vy: 0, vz: 0, rx: 0, ry: 0, rz: 0};
-// Target
+// Training
 var targetMesh, targetPhysMat, targetBody;
+var grenadeMesh, grenadePhysMat, grenadeBody, grenades = [];
 // Obstacles
 var obstacles = [];
 // Gun box
@@ -194,7 +195,7 @@ function init() {
     //===================================================================
     // CANNON-ES-DEBUGGER
 
-    //cannonDebugger = new CannonDebugger(scene, world);
+    cannonDebugger = new CannonDebugger(scene, world);
 
     //===================================================================
     // BUILDING THE SCENE
@@ -430,7 +431,7 @@ function animate() {
     // Move the robot
     robotMovement();
     // Update cannon-es-debugger
-    //cannonDebugger.update();
+    cannonDebugger.update();
     // Rotate guns
     pickableObjects.forEach( (gun) => {
         gun.rotation.y += 0.01;
@@ -455,6 +456,11 @@ function updatePhysics() {
     // Robot
     robotMesh.position.copy(robotBody.position);
     robotMesh.quaternion.copy(robotBody.quaternion);
+    // Grenades
+    grenades.forEach((nade) => {
+        nade.mesh.position.copy(nade.body.position);
+        nade.mesh.quaternion.copy(nade.body.quaternion);
+    });
 }
 
 //===================================================================
@@ -670,10 +676,59 @@ function buildRoom() {
     });
     training = new THREE.Mesh(labelGeo, labelMat);
     training.rotation.set(0, -.25*Math.PI, 0);
-    training.position.set(40, 10, -40);
+    training.position.set(40, 20, -40);
     training.castShadow = false;
     training.receiveShadow = true;
     scene.add(training);
+
+    // Third Wall
+    var wall3Mesh = new THREE.Mesh(wallGeo, wallMat);
+    wall3Mesh.position.set(0, 10, 50);
+    wall3Mesh.castShadow = false;
+    wall3Mesh.receiveShadow = true;
+    scene.add(wall3Mesh);
+
+    var wall3Body = new CANNON.Body({
+        type: CANNON.Body.STATIC,
+        shape: new CANNON.Box(new CANNON.Vec3(50, 10, 1)),
+        material: wallPhysMat,
+        collisionFilterGroup: GROUP_OBJECTS,
+        collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
+    });
+    wall3Body.position.set(0, 10, 51);
+    world.addBody(wall3Body);
+
+    labelGeo = new THREE.PlaneGeometry(15, 6);
+    texture = new THREE.TextureLoader(loadingManager).load('images/fight.png');
+    labelMat = new THREE.MeshPhongMaterial({
+        color: 0x00bdc8,
+        map: texture,
+        side: THREE.DoubleSide,
+        transparent: true
+    });
+    fight = new THREE.Mesh(labelGeo, labelMat);
+    fight.position.set(0, 12, 45);
+    fight.rotation.set(0, Math.PI, 0);
+    fight.castShadow = false;
+    fight.receiveShadow = true;
+    scene.add(fight);
+
+    // Corner
+
+    labelGeo = new THREE.PlaneGeometry(15, 6);
+    texture = new THREE.TextureLoader(loadingManager).load('images/spin.png');
+    labelMat = new THREE.MeshPhongMaterial({
+        color: 0x00bdc8,
+        map: texture,
+        side: THREE.DoubleSide,
+        transparent: true
+    });
+    var spin = new THREE.Mesh(labelGeo, labelMat);
+    spin.rotation.set(0, -.75*Math.PI, 0);
+    spin.position.set(42, 20, 42);
+    spin.castShadow = false;
+    spin.receiveShadow = true;
+    scene.add(spin);
 }
 
 //===================================================================
@@ -906,6 +961,7 @@ function loadGuns() {
 
 function loadTraining() {
 
+    // Target
     loader.load('models/target.gltf', function(gltf) {
         targetMesh = gltf.scene;
         targetMesh.traverse((child) => {
@@ -915,8 +971,8 @@ function loadTraining() {
             }
         });
         targetMesh.scale.set(10, 10, 10);
-        targetMesh.position.set(40, -2, -40);
-        targetMesh.rotation.set(0, -.25*Math.PI, 0);
+        targetMesh.position.set(45, -2, -30);
+        targetMesh.rotation.set(0, -.5*Math.PI, 0);
         scene.add(targetMesh);
     }, undefined, function(error) {
         console.error(error);
@@ -927,13 +983,123 @@ function loadTraining() {
     targetBody = new CANNON.Body({
         type: CANNON.Body.STATIC,
         shape: new CANNON.Box(new CANNON.Vec3(2.5, 2.5, 1)),
-        position: new CANNON.Vec3(40.5, 2.5, -40),
+        position: new CANNON.Vec3(45, 2.5, -30),
         material: robotPhysMat,
         collisionFilterGroup: GROUP_OBJECTS,
         collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
     });
-    targetBody.quaternion.setFromEuler(0, -.25*Math.PI, 0);
+    targetBody.quaternion.setFromEuler(0, -.5*Math.PI, 0);
     world.addBody(targetBody);
+
+    // Box
+    var boxGeo = new THREE.BoxGeometry(8, 1, 4);
+    var boxMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+    });
+    var boxMesh = new THREE.Mesh(boxGeo, boxMat);
+    boxMesh.position.set(35, 1, -40);
+    boxMesh.castShadow = true;
+    boxMesh.receiveShadow = true;
+    scene.add(boxMesh);
+
+    var boxBody = new CANNON.Body({
+        type: CANNON.Body.STATIC,
+        shape: new CANNON.Box(new CANNON.Vec3(4, 0.5, 2)),
+        position: new CANNON.Vec3(35, 1, -40),
+        collisionFilterGroup: GROUP_OBJECTS,
+        collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
+    });
+    world.addBody(boxBody);
+
+    // Pyramid of cylinders
+    for (let i = 33; i <= 37; i += 2) {
+        loader.load('models/grenade.gltf', function(gltf) {
+            grenadeMesh = gltf.scene;
+            grenadeMesh.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+            grenadeMesh.scale.set(8, 8, 8);
+            grenadeMesh.position.set(i, 3, -40);
+            scene.add(grenadeMesh);
+
+            grenadePhysMat = new CANNON.Material();
+
+            grenadeBody = new CANNON.Body({
+                mass: 2,
+                shape: new CANNON.Cylinder(0.7, 0.7, 2.2, 32),
+                position: new CANNON.Vec3(i, 3, -40),
+                material: grenadePhysMat,
+                collisionFilterGroup: GROUP_OBJECTS,
+                collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
+            });
+            world.addBody(grenadeBody);
+
+            grenades.push({mesh: grenadeMesh, body: grenadeBody});
+        }, undefined, function(error) {
+            console.error(error);
+        });
+    }
+    for (let i = 34; i <= 36; i += 2) {
+        loader.load('models/grenade.gltf', function(gltf) {
+            grenadeMesh = gltf.scene;
+            grenadeMesh.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+            grenadeMesh.scale.set(8, 8, 8);
+            grenadeMesh.position.set(i, 6, -40);
+            scene.add(grenadeMesh);
+
+            grenadePhysMat = new CANNON.Material();
+
+            grenadeBody = new CANNON.Body({
+                mass: 2,
+                shape: new CANNON.Cylinder(0.7, 0.7, 2.2, 32),
+                position: new CANNON.Vec3(i, 6, -40),
+                material: grenadePhysMat,
+                collisionFilterGroup: GROUP_OBJECTS,
+                collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
+            });
+            world.addBody(grenadeBody);
+
+            grenades.push({mesh: grenadeMesh, body: grenadeBody});
+        }, undefined, function(error) {
+            console.error(error);
+        });
+    }
+    loader.load('models/grenade.gltf', function(gltf) {
+        grenadeMesh = gltf.scene;
+        grenadeMesh.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+        grenadeMesh.scale.set(8, 8, 8);
+        grenadeMesh.position.set(35, 9, -40);
+        scene.add(grenadeMesh);
+
+        grenadePhysMat = new CANNON.Material();
+
+        grenadeBody = new CANNON.Body({
+            mass: 2,
+            shape: new CANNON.Cylinder(0.7, 0.7, 2.2, 32),
+            position: new CANNON.Vec3(35, 9, -40),
+            material: grenadePhysMat,
+            collisionFilterGroup: GROUP_OBJECTS,
+            collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
+        });
+        world.addBody(grenadeBody);
+
+        grenades.push({mesh: grenadeMesh, body: grenadeBody});
+    }, undefined, function(error) {
+        console.error(error);
+    });
 
 }
 
