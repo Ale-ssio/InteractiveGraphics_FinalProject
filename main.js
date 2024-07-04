@@ -4,6 +4,7 @@ import * as dat from 'dat.gui';
 import CannonDebugger from 'cannon-es-debugger'
 import WebGL from 'three/examples/jsm/capabilities/WebGL.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 // VARIABLES DECLARATION
 // Three.js main variables
@@ -37,6 +38,9 @@ var robot = {vx: 0, vy: 0, vz: 0, rx: 0, ry: 0, rz: 0};
 // Training
 var targetMesh, targetPhysMat, targetBody;
 var grenadeMesh, grenadePhysMat, grenadeBody, grenades = [];
+// Crate
+var crateMesh, cratePhysMat, crateBody, crateTexture, crates = [];
+var gems = [];
 // Obstacles
 var obstacles = [];
 // Gun box
@@ -195,7 +199,7 @@ function init() {
     //===================================================================
     // CANNON-ES-DEBUGGER
 
-    cannonDebugger = new CannonDebugger(scene, world);
+    //cannonDebugger = new CannonDebugger(scene, world);
 
     //===================================================================
     // BUILDING THE SCENE
@@ -248,6 +252,8 @@ function init() {
     loadGuns();
 
     loadTraining();
+
+    loadSpin();
 
     spawnEnemy();
     
@@ -373,6 +379,95 @@ function onMouseClick(event) {
 
     }
 
+    // CRATE SPINNING
+
+    raycaster.set(camera.position, camera.getWorldDirection(new THREE.Vector3()));
+
+    // Calculate objects intersecting the picking ray
+    intersects = raycaster.intersectObjects(crates, true);
+
+    if (intersects.length > 0 && player.coins >= 2) {
+
+        intersectedObject = intersects[0].object;
+        while (intersectedObject.parent && intersectedObject.parent.type !== 'Scene') {
+            intersectedObject = intersectedObject.parent;
+        }
+
+        switch(intersectedObject.name) {
+            case '2coins':
+                player.coins -= 2;
+                document.getElementById("coins").innerHTML = player.coins;
+
+                var pickColor = Math.random();
+                var color;
+                if (pickColor <= 0.4) color = 0xffc000;
+                else if (pickColor <= 0.7) color = 0x1ff2ff;
+                else if (pickColor <= 0.9) color = 0x00ff00;
+                else color = 0xe4a0f7;
+
+                var convexGeo = new THREE.IcosahedronGeometry(0.5); 
+                var convexMat = new THREE.MeshStandardMaterial({color: color});
+                var convexMesh= new THREE.Mesh(convexGeo, convexMat);
+                convexMesh.castShadow = true;
+                convexMesh.receiveShadow = true;
+                scene.add(convexMesh);
+
+                // Vertices
+
+                convexGeo.deleteAttribute('normal');
+				convexGeo.deleteAttribute('uv');
+				convexGeo = BufferGeometryUtils.mergeVertices(convexGeo);
+
+                var vertices = [];
+                for (let i = 0; i < convexGeo.attributes.position.count; i++) {
+                    vertices.push(
+                        new CANNON.Vec3(
+                            convexGeo.attributes.position.getX(i),
+                            convexGeo.attributes.position.getY(i),
+                            convexGeo.attributes.position.getZ(i)
+                        )
+                    );
+                }
+
+                // Faces
+                var faces = [];
+                console.log(convexGeo.index);
+                for (let i = 0; i < convexGeo.index.count; i += 3) {
+                    faces.push([
+                        convexGeo.index.getX(i),
+                        convexGeo.index.getX(i + 1),
+                        convexGeo.index.getX(i + 2)
+                    ]);
+                }
+                
+                // Create a ConvexPolyhedron shape from the vertices and faces
+                var convexShape = new CANNON.ConvexPolyhedron({
+                    vertices: vertices,
+                    faces: faces
+                });
+
+                var convexBody = new CANNON.Body({
+                    mass: 1,
+                    shape: convexShape
+                });
+                convexBody.position.set(
+                    crateBody.position.x,
+                    crateBody.position.y + 3,
+                    crateBody.position.z
+                );
+                var speedx = Math.random() * -3;
+                var speedz = Math.random() * 3;
+                var chance = Math.random();
+                if (chance > 0.5) speedz *= -1;
+                convexBody.velocity.set(speedx, 10, speedz);
+                world.addBody(convexBody);
+
+                gems.push({mesh: convexMesh, body: convexBody});
+
+                break;
+        }
+    }
+
 }
 
 // Don't request pointer lock if you click on dat GUI
@@ -431,7 +526,7 @@ function animate() {
     // Move the robot
     robotMovement();
     // Update cannon-es-debugger
-    cannonDebugger.update();
+    //cannonDebugger.update();
     // Rotate guns
     pickableObjects.forEach( (gun) => {
         gun.rotation.y += 0.01;
@@ -456,10 +551,20 @@ function updatePhysics() {
     // Robot
     robotMesh.position.copy(robotBody.position);
     robotMesh.quaternion.copy(robotBody.quaternion);
+    // Crate
+    crateMesh.position.x = crateBody.position.x;
+    crateMesh.position.y = crateBody.position.y - 1.5;
+    crateMesh.position.z = crateBody.position.z;
+    crateMesh.quaternion.copy(crateBody.quaternion);
     // Grenades
     grenades.forEach((nade) => {
         nade.mesh.position.copy(nade.body.position);
         nade.mesh.quaternion.copy(nade.body.quaternion);
+    });
+    // Gems
+    gems.forEach((gem) => {
+        gem.mesh.position.copy(gem.body.position);
+        gem.mesh.quaternion.copy(gem.body.quaternion);
     });
 }
 
@@ -957,7 +1062,7 @@ function loadGuns() {
 }
 
 //===================================================================
-// LOADING TARGET FUNCTION
+// LOADING TRAINING FUNCTION
 
 function loadTraining() {
 
@@ -1101,6 +1206,55 @@ function loadTraining() {
         console.error(error);
     });
 
+}
+
+//===================================================================
+// LOADING SPIN FUNCTION
+
+function loadSpin() {
+    loader.load('models/crate.gltf', function(gltf) {
+        crateMesh = gltf.scene;
+        crateMesh.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+        crateMesh.scale.set(4, 4, 4);
+        crateMesh.name = '2coins';
+        crates.push(crateMesh);
+        scene.add(crateMesh);
+
+        cratePhysMat = new CANNON.Material();
+
+        crateBody = new CANNON.Body({
+            mass: 100,
+            shape: new CANNON.Box(new CANNON.Vec3(1.5, 1.5, 1.5)),
+            position: new CANNON.Vec3(45, 3, 45),
+            material: cratePhysMat,
+            collisionFilterGroup: GROUP_OBJECTS,
+            collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
+        });
+        world.addBody(crateBody);
+
+    }, undefined, function(error) {
+        console.error(error);
+    });
+
+    labelGeo = new THREE.PlaneGeometry(4, 2);
+    texture = new THREE.TextureLoader(loadingManager).load('images/coins2.png');
+    labelMat = new THREE.MeshPhongMaterial({
+        color: 0x1ff2ff,
+        map: texture,
+        side: THREE.DoubleSide,
+        transparent: true
+    });
+    crateTexture = new THREE.Mesh(labelGeo, labelMat);
+    crateTexture.rotation.set(0, -.75*Math.PI, 0);
+    crateTexture.position.set(45, 5, 45);
+    crateTexture.castShadow = true;
+    crateTexture.receiveShadow = true;
+    scene.add(crateTexture);
 }
 
 //===================================================================
