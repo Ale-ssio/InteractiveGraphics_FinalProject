@@ -9,7 +9,7 @@ import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUti
 // VARIABLES DECLARATION
 // Three.js main variables
 var scene, camera, renderer;
-var player = {height: 1.8, speed: 0.2, fast: 0, turnSpeed: Math.PI * 0.01, canJump: true, startJump: 0, coins: 30};
+var player = {height: 1.8, speed: 0.2, fast: 0, turnSpeed: Math.PI * 0.01, maxBullets: 10, canJump: true, startJump: 0, coins: 30, color: 0xffc000};
 var playerPhysMat, playerBody;
 var clock = new THREE.Clock();
 // Loader for 3D models, Controls, Gui Controls
@@ -31,7 +31,6 @@ var floorGeo, floorMat, floorMesh, floorPhysMat, floorBody;
 var wallGeo, wallMat, wall1Mesh, wall2Mesh, wallPhysMat, wall1Body, wall2Body;
 // Bullets
 var bulletGeo, bulletMat, bulletMesh, bulletPhysMat, bulletBody, bullets = [];
-const MAX_BULLETS = 10;
 // Robot
 var robotMesh, robotPhysMat, robotBody;
 var robot = {vx: 0, vy: 0, vz: 0, rx: 0, ry: 0, rz: 0};
@@ -199,7 +198,7 @@ function init() {
     //===================================================================
     // CANNON-ES-DEBUGGER
 
-    //cannonDebugger = new CannonDebugger(scene, world);
+    cannonDebugger = new CannonDebugger(scene, world);
 
     //===================================================================
     // BUILDING THE SCENE
@@ -252,6 +251,8 @@ function init() {
     loadGuns();
 
     loadTraining();
+
+    loadPyramid();
 
     loadSpin();
 
@@ -386,85 +387,123 @@ function onMouseClick(event) {
     // Calculate objects intersecting the picking ray
     intersects = raycaster.intersectObjects(crates, true);
 
-    if (intersects.length > 0 && player.coins >= 2) {
+    if (intersects.length > 0) {
 
         intersectedObject = intersects[0].object;
         while (intersectedObject.parent && intersectedObject.parent.type !== 'Scene') {
             intersectedObject = intersectedObject.parent;
         }
 
+        var through = false;
+        var convexGeo;
+
+        var pickColor = Math.random();
+        var color;
+        if (pickColor <= 0.4) color = 0xffc000;
+        else if (pickColor <= 0.7) color = 0x1ff2ff;
+        else if (pickColor <= 0.9) color = 0x00ff00;
+        else color = 0xe4a0f7;
+
         switch(intersectedObject.name) {
+            case '1coin':
+                if (player.coins < 1) break;
+                through = true;
+                player.coins -= 1;
+                document.getElementById("coins").innerHTML = player.coins;
+
+                player.color = color;
+
+                convexGeo = new THREE.IcosahedronGeometry(0.5); 
+
+                break;
             case '2coins':
+                if (player.coins < 2) break;
+                through = true;
                 player.coins -= 2;
                 document.getElementById("coins").innerHTML = player.coins;
 
-                var pickColor = Math.random();
-                var color;
-                if (pickColor <= 0.4) color = 0xffc000;
-                else if (pickColor <= 0.7) color = 0x1ff2ff;
-                else if (pickColor <= 0.9) color = 0x00ff00;
-                else color = 0xe4a0f7;
+                player.maxBullets += 1;
+                reloadGuns();
 
-                var convexGeo = new THREE.IcosahedronGeometry(0.5); 
-                var convexMat = new THREE.MeshStandardMaterial({color: color});
-                var convexMesh= new THREE.Mesh(convexGeo, convexMat);
-                convexMesh.castShadow = true;
-                convexMesh.receiveShadow = true;
-                scene.add(convexMesh);
-
-                // Vertices
-
-                convexGeo.deleteAttribute('normal');
-				convexGeo.deleteAttribute('uv');
-				convexGeo = BufferGeometryUtils.mergeVertices(convexGeo);
-
-                var vertices = [];
-                for (let i = 0; i < convexGeo.attributes.position.count; i++) {
-                    vertices.push(
-                        new CANNON.Vec3(
-                            convexGeo.attributes.position.getX(i),
-                            convexGeo.attributes.position.getY(i),
-                            convexGeo.attributes.position.getZ(i)
-                        )
-                    );
-                }
-
-                // Faces
-                var faces = [];
-                console.log(convexGeo.index);
-                for (let i = 0; i < convexGeo.index.count; i += 3) {
-                    faces.push([
-                        convexGeo.index.getX(i),
-                        convexGeo.index.getX(i + 1),
-                        convexGeo.index.getX(i + 2)
-                    ]);
-                }
+                convexGeo = new THREE.OctahedronGeometry(0.5); 
                 
-                // Create a ConvexPolyhedron shape from the vertices and faces
-                var convexShape = new CANNON.ConvexPolyhedron({
-                    vertices: vertices,
-                    faces: faces
-                });
-
-                var convexBody = new CANNON.Body({
-                    mass: 1,
-                    shape: convexShape
-                });
-                convexBody.position.set(
-                    crateBody.position.x,
-                    crateBody.position.y + 3,
-                    crateBody.position.z
-                );
-                var speedx = Math.random() * -3;
-                var speedz = Math.random() * 3;
-                var chance = Math.random();
-                if (chance > 0.5) speedz *= -1;
-                convexBody.velocity.set(speedx, 10, speedz);
-                world.addBody(convexBody);
-
-                gems.push({mesh: convexMesh, body: convexBody});
-
                 break;
+            case '5coins':
+                if (player.coins < 5) break;
+                through = true;
+                player.coins -= 5;
+                document.getElementById("coins").innerHTML = player.coins;
+
+                convexGeo = new THREE.DodecahedronGeometry(0.5); 
+
+                var win = Math.floor(Math.random() * 10);
+
+                if (pickColor > 0.4 && pickColor <= 0.7) player.coins += win;
+                if (pickColor > 0.7 && pickColor <= 0.9) player.coins += win*2;
+                if (pickColor > 0.9) player.coins += win*5;
+                document.getElementById("coins").innerHTML = player.coins;
+                
+                break;
+        }
+
+        if (through) {
+            var convexMat = new THREE.MeshStandardMaterial({color: color});
+            var convexMesh= new THREE.Mesh(convexGeo, convexMat);
+            convexMesh.castShadow = true;
+            convexMesh.receiveShadow = true;
+            scene.add(convexMesh);
+
+            // Vertices
+
+            convexGeo.deleteAttribute('normal');
+            convexGeo.deleteAttribute('uv');
+            convexGeo = BufferGeometryUtils.mergeVertices(convexGeo);
+
+            var vertices = [];
+            for (let i = 0; i < convexGeo.attributes.position.count; i++) {
+                vertices.push(
+                    new CANNON.Vec3(
+                        convexGeo.attributes.position.getX(i),
+                        convexGeo.attributes.position.getY(i),
+                        convexGeo.attributes.position.getZ(i)
+                    )
+                );
+            }
+
+            // Faces
+            var faces = [];
+            for (let i = 0; i < convexGeo.index.count; i += 3) {
+                faces.push([
+                    convexGeo.index.getX(i),
+                    convexGeo.index.getX(i + 1),
+                    convexGeo.index.getX(i + 2)
+                ]);
+            }
+            
+            // Create a ConvexPolyhedron shape from the vertices and faces
+            var convexShape = new CANNON.ConvexPolyhedron({
+                vertices: vertices,
+                faces: faces
+            });
+
+            var convexBody = new CANNON.Body({
+                mass: 1,
+                shape: convexShape
+            });
+            convexBody.position.set(
+                intersectedObject.position.x,
+                intersectedObject.position.y + 3,
+                intersectedObject.position.z
+            );
+            var speedx = Math.random() * -3;
+            var speedz = Math.random() * 3;
+            var chance = Math.random();
+            if (chance > 0.5) speedz *= -1;
+            convexBody.velocity.set(speedx, 10, speedz);
+            convexBody.angularVelocity.set(speedx, 0, speedz);
+            world.addBody(convexBody);
+
+            gems.push({mesh: convexMesh, body: convexBody});
         }
     }
 
@@ -526,7 +565,7 @@ function animate() {
     // Move the robot
     robotMovement();
     // Update cannon-es-debugger
-    //cannonDebugger.update();
+    cannonDebugger.update();
     // Rotate guns
     pickableObjects.forEach( (gun) => {
         gun.rotation.y += 0.01;
@@ -551,11 +590,6 @@ function updatePhysics() {
     // Robot
     robotMesh.position.copy(robotBody.position);
     robotMesh.quaternion.copy(robotBody.quaternion);
-    // Crate
-    crateMesh.position.x = crateBody.position.x;
-    crateMesh.position.y = crateBody.position.y - 1.5;
-    crateMesh.position.z = crateBody.position.z;
-    crateMesh.quaternion.copy(crateBody.quaternion);
     // Grenades
     grenades.forEach((nade) => {
         nade.mesh.position.copy(nade.body.position);
@@ -650,6 +684,13 @@ function robotMovement() {
             world.removeBody(o.body);
         }
         buildObstacles();
+
+        while(grenades.length > 0) {
+            let g = grenades.pop();
+            scene.remove(g.mesh);
+            world.removeBody(g.body);
+        }
+        loadPyramid();
     }
 }
 
@@ -1115,7 +1156,9 @@ function loadTraining() {
         collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
     });
     world.addBody(boxBody);
+}
 
+function loadPyramid() {
     // Pyramid of cylinders
     for (let i = 33; i <= 37; i += 2) {
         loader.load('models/grenade.gltf', function(gltf) {
@@ -1205,13 +1248,13 @@ function loadTraining() {
     }, undefined, function(error) {
         console.error(error);
     });
-
 }
 
 //===================================================================
 // LOADING SPIN FUNCTION
 
 function loadSpin() {
+    // Crate 1
     loader.load('models/crate.gltf', function(gltf) {
         crateMesh = gltf.scene;
         crateMesh.traverse((child) => {
@@ -1221,6 +1264,53 @@ function loadSpin() {
             }
         });
         crateMesh.scale.set(4, 4, 4);
+        crateMesh.position.set(45, 0, 45);
+        crateMesh.name = '1coin';
+        crates.push(crateMesh);
+        scene.add(crateMesh);
+
+        cratePhysMat = new CANNON.Material();
+
+        crateBody = new CANNON.Body({
+            mass: 0,
+            shape: new CANNON.Box(new CANNON.Vec3(1.5, 1.5, 1.5)),
+            position: new CANNON.Vec3(45, 1.5, 45),
+            material: cratePhysMat,
+            collisionFilterGroup: GROUP_OBJECTS,
+            collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
+        });
+        world.addBody(crateBody);
+
+    }, undefined, function(error) {
+        console.error(error);
+    });
+
+    labelGeo = new THREE.PlaneGeometry(4, 2);
+    texture = new THREE.TextureLoader(loadingManager).load('images/coin1.png');
+    labelMat = new THREE.MeshPhongMaterial({
+        color: 0x1ff2ff,
+        map: texture,
+        side: THREE.DoubleSide,
+        transparent: true
+    });
+    crateTexture = new THREE.Mesh(labelGeo, labelMat);
+    crateTexture.rotation.set(0, -.75*Math.PI, 0);
+    crateTexture.position.set(45, 5, 45);
+    crateTexture.castShadow = true;
+    crateTexture.receiveShadow = true;
+    scene.add(crateTexture);
+
+    // Crate 2
+    loader.load('models/crate2.gltf', function(gltf) {
+        crateMesh = gltf.scene;
+        crateMesh.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+        crateMesh.scale.set(8, 8, 8);
+        crateMesh.position.set(35, 1.5, 45);
         crateMesh.name = '2coins';
         crates.push(crateMesh);
         scene.add(crateMesh);
@@ -1228,9 +1318,9 @@ function loadSpin() {
         cratePhysMat = new CANNON.Material();
 
         crateBody = new CANNON.Body({
-            mass: 100,
+            mass: 0,
             shape: new CANNON.Box(new CANNON.Vec3(1.5, 1.5, 1.5)),
-            position: new CANNON.Vec3(45, 3, 45),
+            position: new CANNON.Vec3(35, 1.5, 45),
             material: cratePhysMat,
             collisionFilterGroup: GROUP_OBJECTS,
             collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
@@ -1250,8 +1340,55 @@ function loadSpin() {
         transparent: true
     });
     crateTexture = new THREE.Mesh(labelGeo, labelMat);
-    crateTexture.rotation.set(0, -.75*Math.PI, 0);
-    crateTexture.position.set(45, 5, 45);
+    crateTexture.rotation.set(0, Math.PI, 0);
+    crateTexture.position.set(35, 5, 45);
+    crateTexture.castShadow = true;
+    crateTexture.receiveShadow = true;
+    scene.add(crateTexture);
+
+    // Crate 3
+    loader.load('models/crate3.gltf', function(gltf) {
+        crateMesh = gltf.scene;
+        crateMesh.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+        crateMesh.scale.set(3.5, 3.5, 3.5);
+        crateMesh.position.set(45, 1.5, 35);
+        crateMesh.rotation.set(0, -.5 * Math.PI, 0);
+        crateMesh.name = '5coins';
+        crates.push(crateMesh);
+        scene.add(crateMesh);
+
+        cratePhysMat = new CANNON.Material();
+
+        crateBody = new CANNON.Body({
+            mass: 0,
+            shape: new CANNON.Box(new CANNON.Vec3(1.5, 1.5, 1.5)),
+            position: new CANNON.Vec3(45, 1.5, 35),
+            material: cratePhysMat,
+            collisionFilterGroup: GROUP_OBJECTS,
+            collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
+        });
+        world.addBody(crateBody);
+
+    }, undefined, function(error) {
+        console.error(error);
+    });
+
+    labelGeo = new THREE.PlaneGeometry(4, 2);
+    texture = new THREE.TextureLoader(loadingManager).load('images/coins5.png');
+    labelMat = new THREE.MeshPhongMaterial({
+        color: 0x1ff2ff,
+        map: texture,
+        side: THREE.DoubleSide,
+        transparent: true
+    });
+    crateTexture = new THREE.Mesh(labelGeo, labelMat);
+    crateTexture.rotation.set(0, -.5*Math.PI, 0);
+    crateTexture.position.set(45, 5, 35);
     crateTexture.castShadow = true;
     crateTexture.receiveShadow = true;
     scene.add(crateTexture);
@@ -1262,7 +1399,7 @@ function loadSpin() {
 
 function shootBullet() {
 
-    if (bullets.length < MAX_BULLETS) {
+    if (bullets.length < player.maxBullets) {
         switch(selected.name) {
             case 'bigGun':
                 bulletGeo = new THREE.SphereGeometry(1, 8, 8);
@@ -1331,7 +1468,7 @@ function shootBullet() {
         
         // BULLET IN THREE.JS
         bulletMat = new THREE.MeshStandardMaterial({
-            color: 0xffc000
+            color: player.color
         });
         bulletMesh = new THREE.Mesh(bulletGeo, bulletMat);
         bulletMesh.castShadow = true;
@@ -1360,7 +1497,7 @@ function shootBullet() {
         world.addBody(bulletBody);
 
         // Bullets left
-        document.getElementById("bullets").innerHTML = 10 - bullets.length;
+        document.getElementById("bullets").innerHTML = player.maxBullets - bullets.length;
 
         // ==============================================================
         // CONTACT BETWEEN MATERIALS
@@ -1392,5 +1529,5 @@ function reloadGuns() {
         world.removeBody(b.body);
     }
     document.getElementById('reloading').style.visibility = "hidden";
-    document.getElementById("bullets").innerHTML = 10;
+    document.getElementById("bullets").innerHTML = player.maxBullets;
 }
