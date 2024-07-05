@@ -198,7 +198,7 @@ function init() {
     //===================================================================
     // CANNON-ES-DEBUGGER
 
-    //cannonDebugger = new CannonDebugger(scene, world);
+    cannonDebugger = new CannonDebugger(scene, world);
 
     //===================================================================
     // BUILDING THE SCENE
@@ -597,7 +597,7 @@ function animate() {
     // Move the robot
     robotMovement();
     // Update cannon-es-debugger
-    //cannonDebugger.update();
+    cannonDebugger.update();
     // Rotate guns
     pickableObjects.forEach( (gun) => {
         gun.rotation.y += 0.01;
@@ -619,6 +619,13 @@ function updatePhysics() {
     camera.position.x = playerBody.position.x;
     camera.position.y = playerBody.position.y + 1;
     camera.position.z = playerBody.position.z;
+    // Obstacles
+    obstacles.forEach((obs, index) => {
+        var phase = index * 0.5;
+        obs.body.position.z = obs.z + Math.sin(Date.now() * 0.001 + phase) * 4;
+        obs.mesh.position.copy(obs.body.position);
+        obs.mesh.quaternion.copy(obs.body.quaternion);
+    });
     // Robot
     robotMesh.position.copy(robotBody.position);
     robotMesh.quaternion.copy(robotBody.quaternion);
@@ -918,35 +925,36 @@ function buildRoom() {
 // OBSTACLES BUILDING FUNCTION
 
 function buildObstacles() {
-    var buildPoss, obsHeight;
-    for (let i = -40; i <= -4; i += 6) {
-        for (let j = -48; j <= 48; j += 6) {
-            buildPoss = Math.random();
-            if (buildPoss > 0.8) {
-                obsHeight = Math.random() * 10;
-                var boxGeo = new THREE.BoxGeometry(3, obsHeight, 3);
-                var boxMat = new THREE.MeshBasicMaterial({
-                    color: 0xffffff
-                });
-                var boxMesh = new THREE.Mesh(boxGeo, boxMat);
-                boxMesh.position.set(i, obsHeight/2, j);
-                boxMesh.castShadow = true;
-                boxMesh.receiveShadow = true;
-                scene.add(boxMesh);
+    var obsHeight;
+    for (let i = -44; i <= -20; i += 12) {
+        for (let j = -40; j <= 40; j += 20) {
+            obsHeight = Math.random() * 10;
+            var boxGeo = new THREE.BoxGeometry(5, obsHeight, 5);
+            var boxMat = new THREE.MeshBasicMaterial({
+                color: 0xffffff
+            });
+            var boxMesh = new THREE.Mesh(boxGeo, boxMat);
+            boxMesh.position.set(i, obsHeight/2, j);
+            boxMesh.castShadow = true;
+            boxMesh.receiveShadow = true;
+            scene.add(boxMesh);
 
-                // BODY FOR THE BOX (PHYSIC BOX)
-                var boxBody = new CANNON.Body({
-                    type: CANNON.Body.STATIC,
-                    shape: new CANNON.Box(new CANNON.Vec3(1.5, obsHeight/2, 1.5)),
-                    position: new CANNON.Vec3(i, obsHeight/2, j),
-                    material: wallPhysMat,
-                    collisionFilterGroup: GROUP_OBJECTS,
-                    collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
-                });
-                world.addBody(boxBody);
+            // BODY FOR THE BOX (PHYSIC BOX)
+            var boxBody = new CANNON.Body({
+                type: CANNON.Body.STATIC,
+                shape: new CANNON.Box(new CANNON.Vec3(2.5, obsHeight/2, 2.5)),
+                position: new CANNON.Vec3(i, obsHeight/2, j),
+                material: wallPhysMat,
+                collisionFilterGroup: GROUP_OBJECTS,
+                collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
+            });
+            world.addBody(boxBody);
 
-                obstacles.push({mesh: boxMesh, body: boxBody});
-            }
+            obstacles.push({
+                mesh: boxMesh, 
+                body: boxBody,
+                z: j
+            });
         }
     }
 }
@@ -974,7 +982,7 @@ function spawnEnemy() {
 
     robotBody = new CANNON.Body({
         mass: 20,
-        shape: new CANNON.Sphere(3),
+        shape: new CANNON.Sphere(2.5),
         position: new CANNON.Vec3(0, 5, 0),
         material: robotPhysMat
     });
