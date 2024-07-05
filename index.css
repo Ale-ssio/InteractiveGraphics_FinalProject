@@ -44,24 +44,6 @@ body {
     visibility: hidden;
 }
 
-#tutorial {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 400px;
-    height: 450px;
-    transform: translate(-50%, -50%);
-    color: white;
-    background: transparent;
-    backdrop-filter: blur(20px);
-    border-radius: 20%;
-    border: 1px solid white;
-    text-align: center;
-    align-content: center;
-    font-weight: bold;
-    visibility: visible;
-}
-
 #pause {
     position: absolute;
     top: 50%;
@@ -70,12 +52,68 @@ body {
     height: 250px;
     transform: translate(-50%, -50%);
     color: white;
-    background-color: black;
+    background-color: #00000080;
+    backdrop-filter: blur(20px);
     border: 1px solid white;
     text-align: center;
     align-content: center;
     font-weight: bold;
     visibility: hidden;
+}
+
+#tutorial {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 900px;
+    height: 550px;
+    transform: translate(-50%, -50%);
+    color: white;
+    background-color: #ffc00010;
+    backdrop-filter: blur(20px);
+    border: 1px solid white;
+    text-align: center;
+    font-weight: bold;
+    visibility: visible;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    padding: 20px;
+}
+
+.corner {
+    width: 45%;
+    height: 45%;
+    background-color: #00000080;
+    border: 1px solid white;
+    border-radius: 20px;
+    padding-left: 5px;
+    padding-right: 5px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.corner p {
+    margin: 10px 0;
+}
+
+.corner.top-left {
+    align-self: flex-start;
+}
+
+.corner.top-right {
+    align-self: flex-start;
+}
+
+.corner.bottom-left {
+    align-self: flex-end;
+}
+
+.corner.bottom-right {
+    align-self: flex-end;
 }
 
 #bullets {
