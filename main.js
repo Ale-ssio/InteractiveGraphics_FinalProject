@@ -198,7 +198,7 @@ function init() {
     //===================================================================
     // CANNON-ES-DEBUGGER
 
-    cannonDebugger = new CannonDebugger(scene, world);
+    //cannonDebugger = new CannonDebugger(scene, world);
 
     //===================================================================
     // BUILDING THE SCENE
@@ -302,211 +302,243 @@ function onMouseClick(event) {
 
     document.getElementById("tutorial").style.visibility = "hidden";
     document.getElementById("pause").style.visibility = "hidden";
-    document.body.requestPointerLock();
 
-    // Update the raycaster with the camera and mouse position
-    raycaster.set(camera.position, camera.getWorldDirection(new THREE.Vector3()));
+    if (document.pointerLockElement === document.body) {
 
-    // Calculate objects intersecting the picking ray
-    intersects = raycaster.intersectObjects(pickableObjects, true);
+        // Update the raycaster with the camera and mouse position
+        raycaster.set(camera.position, camera.getWorldDirection(new THREE.Vector3()));
 
-    // Reset the position of all pickable objects
-    pickableObjects.forEach(obj => {
-        if (obj != selected) obj.position.y = 1
-    });
+        // Calculate objects intersecting the picking ray
+        intersects = raycaster.intersectObjects(pickableObjects, true);
 
-    // If there's an intersection, raise the selected object
-    if (intersects.length > 0) {
-        intersectedObject = intersects[0].object;
+        // Reset the position of all pickable objects
+        pickableObjects.forEach(obj => {
+            if (obj != selected) obj.position.y = 1
+        });
 
-        // Traverse up to the top-level parent of the intersected object
-        while (intersectedObject.parent && intersectedObject.parent.type !== 'Scene') {
-            intersectedObject = intersectedObject.parent;
-        }
-        //console.log(intersectedObject.name);
-        if (intersectedObject != selected) {
+        // If there's an intersection, raise the selected object
+        if (intersects.length > 0) {
+            intersectedObject = intersects[0].object;
 
-            switch(intersectedObject.name) {
-                case 'littleGun':
-                    document.getElementById("pistol").style.visibility = "visible";
-                    document.getElementById("rifle").style.visibility = "hidden";
-                    document.getElementById("grenade").style.visibility = "hidden";
-                    intersectedObject.position.y += 2;
-                    selected = intersectedObject;
-                    pickableObjects.forEach(obj => {
-                        if (obj != selected) obj.position.y = 1;
-                    });
-                    break;
-                case 'mediumGun':
-                    if (medium_gun.bought == false && player.coins >= medium_gun.price) {
-                        player.coins -= medium_gun.price;
-                        document.getElementById("coins").innerHTML = player.coins;
-                        scene.remove(medium_gun.lock);
-                        scene.remove(medium_gun.texture);
-                        medium_gun.bought = true;
-                    }
-                    if (medium_gun.bought == true) {
-                        document.getElementById("pistol").style.visibility = "hidden";
-                        document.getElementById("rifle").style.visibility = "visible";
+            // Traverse up to the top-level parent of the intersected object
+            while (intersectedObject.parent && intersectedObject.parent.type !== 'Scene') {
+                intersectedObject = intersectedObject.parent;
+            }
+
+            var distancex = intersectedObject.position.x - playerBody.position.x;
+            var distancez = intersectedObject.position.z - playerBody.position.z;
+            //console.log(intersectedObject.name);
+            if (intersectedObject != selected && distancex <= 15 && distancez <= 15) {
+
+                switch(intersectedObject.name) {
+                    case 'littleGun':
+                        document.getElementById("pistol").style.visibility = "visible";
+                        document.getElementById("rifle").style.visibility = "hidden";
                         document.getElementById("grenade").style.visibility = "hidden";
                         intersectedObject.position.y += 2;
                         selected = intersectedObject;
                         pickableObjects.forEach(obj => {
                             if (obj != selected) obj.position.y = 1;
                         });
-                    }
-                    break;
-                case 'bigGun':
-                    if (big_gun.bought == false && player.coins >= big_gun.price) {
-                        player.coins -= big_gun.price;
+                        break;
+                    case 'mediumGun':
+                        if (medium_gun.bought == false && player.coins >= medium_gun.price) {
+                            player.coins -= medium_gun.price;
+                            document.getElementById("coins").innerHTML = player.coins;
+                            scene.remove(medium_gun.lock);
+                            scene.remove(medium_gun.texture);
+                            medium_gun.bought = true;
+                        }
+                        if (medium_gun.bought == true) {
+                            document.getElementById("pistol").style.visibility = "hidden";
+                            document.getElementById("rifle").style.visibility = "visible";
+                            document.getElementById("grenade").style.visibility = "hidden";
+                            intersectedObject.position.y += 2;
+                            selected = intersectedObject;
+                            pickableObjects.forEach(obj => {
+                                if (obj != selected) obj.position.y = 1;
+                            });
+                        }
+                        break;
+                    case 'bigGun':
+                        if (big_gun.bought == false && player.coins >= big_gun.price) {
+                            player.coins -= big_gun.price;
+                            document.getElementById("coins").innerHTML = player.coins;
+                            scene.remove(big_gun.lock);
+                            scene.remove(big_gun.texture);
+                            big_gun.bought = true;
+                        }
+                        if (big_gun.bought == true) {
+                            document.getElementById("pistol").style.visibility = "hidden";
+                            document.getElementById("rifle").style.visibility = "hidden";
+                            document.getElementById("grenade").style.visibility = "visible";
+                            intersectedObject.position.y += 2;
+                            selected = intersectedObject;
+                            pickableObjects.forEach(obj => {
+                                if (obj != selected) obj.position.y = 1;
+                            });
+                        }
+                        break;
+                    case 'button':
+                        while(grenades.length > 0) {
+                            let g = grenades.pop();
+                            scene.remove(g.mesh);
+                            world.removeBody(g.body);
+                        }
+                        loadPyramid();
+                        break;
+                }
+            }
+
+        }
+
+        // CRATE SPINNING
+
+        raycaster.set(camera.position, camera.getWorldDirection(new THREE.Vector3()));
+
+        // Calculate objects intersecting the picking ray
+        intersects = raycaster.intersectObjects(crates, true);
+
+        if (intersects.length > 0) {
+
+            intersectedObject = intersects[0].object;
+            while (intersectedObject.parent && intersectedObject.parent.type !== 'Scene') {
+                intersectedObject = intersectedObject.parent;
+            }
+
+            var distancex = intersectedObject.position.x - playerBody.position.x;
+            var distancez = intersectedObject.position.z - playerBody.position.z;
+
+            if (distancex <= 20 && distancez <= 20) {
+                var through = false;
+                var convexGeo;
+
+                var pickColor = Math.random();
+                var color;
+                if (pickColor <= 0.4) color = 0xffc000;
+                else if (pickColor <= 0.7) color = 0x1ff2ff;
+                else if (pickColor <= 0.9) color = 0x00ff00;
+                else color = 0xe4a0f7;
+
+                switch(intersectedObject.name) {
+                    case '1coin':
+                        if (player.coins < 1) break;
+                        through = true;
+                        player.coins -= 1;
                         document.getElementById("coins").innerHTML = player.coins;
-                        scene.remove(big_gun.lock);
-                        scene.remove(big_gun.texture);
-                        big_gun.bought = true;
+
+                        player.color = color;
+
+                        convexGeo = new THREE.IcosahedronGeometry(0.5); 
+
+                        break;
+                    case '2coins':
+                        if (player.coins < 2) break;
+                        through = true;
+                        player.coins -= 2;
+                        document.getElementById("coins").innerHTML = player.coins;
+                        color = 0x000000;
+
+                        player.maxBullets += 1;
+                        reloadGuns();
+
+                        convexGeo = new THREE.OctahedronGeometry(0.5); 
+                        
+                        break;
+                    case '5coins':
+                        if (player.coins < 5) break;
+                        through = true;
+                        player.coins -= 5;
+                        document.getElementById("coins").innerHTML = player.coins;
+
+                        convexGeo = new THREE.DodecahedronGeometry(0.5); 
+
+                        var win = Math.floor(Math.random() * 5);
+
+                        if (pickColor <= 0.4) {
+                            document.getElementById("win").innerHTML = "(+0)";
+                        }
+                        if (pickColor > 0.4 && pickColor <= 0.7) {
+                            player.coins += win;
+                            document.getElementById("win").innerHTML = "(+" + win + ")";
+                        }
+                        if (pickColor > 0.7 && pickColor <= 0.9) {
+                            player.coins += win*2;
+                            document.getElementById("win").innerHTML = "(+" + win*2 + ")";
+                        }
+                        if (pickColor > 0.9) {
+                            player.coins += win*5;
+                            document.getElementById("win").innerHTML = "(+" + win*5 + ")";
+                        }
+                        document.getElementById("coins").innerHTML = player.coins;
+                        
+                        break;
+                }
+
+                if (through) {
+                    var convexMat = new THREE.MeshStandardMaterial({color: color});
+                    var convexMesh= new THREE.Mesh(convexGeo, convexMat);
+                    convexMesh.castShadow = true;
+                    convexMesh.receiveShadow = true;
+                    scene.add(convexMesh);
+
+                    // Vertices
+
+                    convexGeo.deleteAttribute('normal');
+                    convexGeo.deleteAttribute('uv');
+                    convexGeo = BufferGeometryUtils.mergeVertices(convexGeo);
+
+                    var vertices = [];
+                    for (let i = 0; i < convexGeo.attributes.position.count; i++) {
+                        vertices.push(
+                            new CANNON.Vec3(
+                                convexGeo.attributes.position.getX(i),
+                                convexGeo.attributes.position.getY(i),
+                                convexGeo.attributes.position.getZ(i)
+                            )
+                        );
                     }
-                    if (big_gun.bought == true) {
-                        document.getElementById("pistol").style.visibility = "hidden";
-                        document.getElementById("rifle").style.visibility = "hidden";
-                        document.getElementById("grenade").style.visibility = "visible";
-                        intersectedObject.position.y += 2;
-                        selected = intersectedObject;
-                        pickableObjects.forEach(obj => {
-                            if (obj != selected) obj.position.y = 1;
-                        });
+
+                    // Faces
+                    var faces = [];
+                    for (let i = 0; i < convexGeo.index.count; i += 3) {
+                        faces.push([
+                            convexGeo.index.getX(i),
+                            convexGeo.index.getX(i + 1),
+                            convexGeo.index.getX(i + 2)
+                        ]);
                     }
-                    break;
+                    
+                    // Create a ConvexPolyhedron shape from the vertices and faces
+                    var convexShape = new CANNON.ConvexPolyhedron({
+                        vertices: vertices,
+                        faces: faces
+                    });
+
+                    var convexBody = new CANNON.Body({
+                        mass: 1,
+                        shape: convexShape
+                    });
+                    convexBody.position.set(
+                        intersectedObject.position.x,
+                        intersectedObject.position.y + 3,
+                        intersectedObject.position.z
+                    );
+                    var speedx = Math.random() * -3;
+                    var speedz = Math.random() * 3;
+                    var chance = Math.random();
+                    if (chance > 0.5) speedz *= -1;
+                    convexBody.velocity.set(speedx, 10, speedz);
+                    convexBody.angularVelocity.set(speedx, 0, speedz);
+                    world.addBody(convexBody);
+
+                    gems.push({mesh: convexMesh, body: convexBody});
+                }
             }
         }
-
+    } else {
+        document.body.requestPointerLock();
     }
-
-    // CRATE SPINNING
-
-    raycaster.set(camera.position, camera.getWorldDirection(new THREE.Vector3()));
-
-    // Calculate objects intersecting the picking ray
-    intersects = raycaster.intersectObjects(crates, true);
-
-    if (intersects.length > 0) {
-
-        intersectedObject = intersects[0].object;
-        while (intersectedObject.parent && intersectedObject.parent.type !== 'Scene') {
-            intersectedObject = intersectedObject.parent;
-        }
-
-        var through = false;
-        var convexGeo;
-
-        var pickColor = Math.random();
-        var color;
-        if (pickColor <= 0.4) color = 0xffc000;
-        else if (pickColor <= 0.7) color = 0x1ff2ff;
-        else if (pickColor <= 0.9) color = 0x00ff00;
-        else color = 0xe4a0f7;
-
-        switch(intersectedObject.name) {
-            case '1coin':
-                if (player.coins < 1) break;
-                through = true;
-                player.coins -= 1;
-                document.getElementById("coins").innerHTML = player.coins;
-
-                player.color = color;
-
-                convexGeo = new THREE.IcosahedronGeometry(0.5); 
-
-                break;
-            case '2coins':
-                if (player.coins < 2) break;
-                through = true;
-                player.coins -= 2;
-                document.getElementById("coins").innerHTML = player.coins;
-
-                player.maxBullets += 1;
-                reloadGuns();
-
-                convexGeo = new THREE.OctahedronGeometry(0.5); 
-                
-                break;
-            case '5coins':
-                if (player.coins < 5) break;
-                through = true;
-                player.coins -= 5;
-                document.getElementById("coins").innerHTML = player.coins;
-
-                convexGeo = new THREE.DodecahedronGeometry(0.5); 
-
-                var win = Math.floor(Math.random() * 10);
-
-                if (pickColor > 0.4 && pickColor <= 0.7) player.coins += win;
-                if (pickColor > 0.7 && pickColor <= 0.9) player.coins += win*2;
-                if (pickColor > 0.9) player.coins += win*5;
-                document.getElementById("coins").innerHTML = player.coins;
-                
-                break;
-        }
-
-        if (through) {
-            var convexMat = new THREE.MeshStandardMaterial({color: color});
-            var convexMesh= new THREE.Mesh(convexGeo, convexMat);
-            convexMesh.castShadow = true;
-            convexMesh.receiveShadow = true;
-            scene.add(convexMesh);
-
-            // Vertices
-
-            convexGeo.deleteAttribute('normal');
-            convexGeo.deleteAttribute('uv');
-            convexGeo = BufferGeometryUtils.mergeVertices(convexGeo);
-
-            var vertices = [];
-            for (let i = 0; i < convexGeo.attributes.position.count; i++) {
-                vertices.push(
-                    new CANNON.Vec3(
-                        convexGeo.attributes.position.getX(i),
-                        convexGeo.attributes.position.getY(i),
-                        convexGeo.attributes.position.getZ(i)
-                    )
-                );
-            }
-
-            // Faces
-            var faces = [];
-            for (let i = 0; i < convexGeo.index.count; i += 3) {
-                faces.push([
-                    convexGeo.index.getX(i),
-                    convexGeo.index.getX(i + 1),
-                    convexGeo.index.getX(i + 2)
-                ]);
-            }
-            
-            // Create a ConvexPolyhedron shape from the vertices and faces
-            var convexShape = new CANNON.ConvexPolyhedron({
-                vertices: vertices,
-                faces: faces
-            });
-
-            var convexBody = new CANNON.Body({
-                mass: 1,
-                shape: convexShape
-            });
-            convexBody.position.set(
-                intersectedObject.position.x,
-                intersectedObject.position.y + 3,
-                intersectedObject.position.z
-            );
-            var speedx = Math.random() * -3;
-            var speedz = Math.random() * 3;
-            var chance = Math.random();
-            if (chance > 0.5) speedz *= -1;
-            convexBody.velocity.set(speedx, 10, speedz);
-            convexBody.angularVelocity.set(speedx, 0, speedz);
-            world.addBody(convexBody);
-
-            gems.push({mesh: convexMesh, body: convexBody});
-        }
-    }
-
 }
 
 // Don't request pointer lock if you click on dat GUI
@@ -565,7 +597,7 @@ function animate() {
     // Move the robot
     robotMovement();
     // Update cannon-es-debugger
-    cannonDebugger.update();
+    //cannonDebugger.update();
     // Rotate guns
     pickableObjects.forEach( (gun) => {
         gun.rotation.y += 0.01;
@@ -599,6 +631,7 @@ function updatePhysics() {
     gems.forEach((gem) => {
         gem.mesh.position.copy(gem.body.position);
         gem.mesh.quaternion.copy(gem.body.quaternion);
+        if (gem.body.position.y < 0.5) document.getElementById("win").innerHTML = ""; 
     });
 }
 
@@ -664,11 +697,15 @@ function playerMovement() {
 
 function robotMovement() {
 
+    /*
     if (robotBody.position.x < 0) {
-        var vx = Math.random() * 3;
+        var vz = Math.random() * 3;
+        var chance = Math.random();
+        if (chance > 0.5) vz *= -1;
 
-        robotBody.applyImpulse( new CANNON.Vec3(vx, 0, 0));
+        robotBody.applyImpulse( new CANNON.Vec3(0, 0, vz));
     }
+    */
 
     if (robotBody.position.y < -10) {
         scene.remove(robotMesh);
@@ -882,7 +919,7 @@ function buildRoom() {
 
 function buildObstacles() {
     var buildPoss, obsHeight;
-    for (let i = -48; i <= -4; i += 6) {
+    for (let i = -40; i <= -4; i += 6) {
         for (let j = -48; j <= 48; j += 6) {
             buildPoss = Math.random();
             if (buildPoss > 0.8) {
@@ -1156,6 +1193,18 @@ function loadTraining() {
         collisionFilterMask: GROUP_OBJECTS | GROUP_PLAYER | GROUP_BULLETS
     });
     world.addBody(boxBody);
+
+    // Button
+    var buttonGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.3, 16);
+    var buttonMat = new THREE.MeshStandardMaterial({
+        color: 0xffc000,
+    });
+    var buttonMesh = new THREE.Mesh(buttonGeo, buttonMat);
+    buttonMesh.position.set(35, 1, -38);
+    buttonMesh.rotation.set(.5*Math.PI, 0, 0);
+    buttonMesh.name = 'button';
+    pickableObjects.push(buttonMesh);
+    scene.add(buttonMesh);
 }
 
 function loadPyramid() {
