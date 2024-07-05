@@ -15,17 +15,30 @@
         </div>
 
         <div id="tutorial">
-            <p class="button">TUTORIAL</p>
-            <p>Move the player with <span class="button">WASD</span></p>
-            <p>Shoot with <span class="button">SPACE</span></p>
-            <p>Run with <span class="button">SHIFT</span></p>
-            <p>Jump with <span class="button">E</span></p>
-            <p>You have <span class="button">10</span> bullets, no matter the gun</p>
-            <p>You can reload in any moment with <span class="button">R</span></p>
-            <p>To change the gun, <span class="button">click</span> on it with the crosshair</p>
-            <p>To kill the enemy you need to push him off the plane</p>
-            <p>Killing the enemy grants you 1 coin</p>
-            <p style="padding-top: 30px;">Click to exit</p>
+            <div class="corner top-left">
+                <p style="font-weight: bold; font-size: 25px; padding-bottom: 10px;">SCI-FI SHOOTER</p>
+                <p>MOVE the player with <span class="button">WASD</span></p>
+                <p>RUN with <span class="button">SHIFT</span></p>
+                <p>JUMP with <span class="button">E</span></p>
+                <p>SHOOT with <span class="button">SPACE</span></p>
+            </div>
+            <div class="corner top-right">
+                <p>You have <span class="button">10</span> BULLETS, no matter the gun</p>
+                <p>You can RELOAD in any moment with <span class="button">R</span></p>
+                <p>To BUY/CHANGE the gun, <span class="button">click</span> on it with the crosshair</p>
+                <p style="padding-top: 10px;">To KILL the enemy you need to SHOOT him OFF the plane</p>
+                <p>KILLING the enemy grants you <span class="button">1 COIN</span></p>
+            </div>
+            <div class="corner bottom-left">
+                <p>There are 3 <span class="button">CRATES</span></p>
+                <p><span class="button">1 COIN:</span> gives you a RANDOM COLOR for your bullets</p>
+                <p><span class="button">2 COINS:</span> INCREASE your BULLETS number by 1</p>
+                <p><span class="button">5 COINS:</span> gives you a RANDOM number of COINS [0-25] :P</p>
+            </div>
+            <div class="corner bottom-right">
+                <p>In the TRAINING ZONE you can press the <span class="button">Yellow BUTTON</span> to RESET the pyramid of grenades</p>
+                <p style="padding-top: 30px;">CLICK anywhere to START PLAYING</p>
+            </div>
         </div>
 
         <div id="pause">
@@ -42,6 +55,7 @@
         <div style="top: 3%; left: 3%; position: fixed; color: #1ff2ff; font-size: 30px;">
             COINS:
             <span id="coins">0</span>
+            <span style="padding-left: 50px;" id="win"></span>
         </div>
         <div id="bullets" style="padding-right: 10px;">10</div>
         
