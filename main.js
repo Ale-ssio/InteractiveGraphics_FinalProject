@@ -39,7 +39,7 @@ var targetMesh, targetPhysMat, targetBody;
 var grenadeMesh, grenadePhysMat, grenadeBody, grenades = [];
 // Crate
 var crateMesh, cratePhysMat, crateBody, crateTexture, crates = [];
-var gems = [];
+var showWin, gems = [];
 // Obstacles
 var obstacles = [];
 // Gun box
@@ -198,7 +198,7 @@ function init() {
     //===================================================================
     // CANNON-ES-DEBUGGER
 
-    cannonDebugger = new CannonDebugger(scene, world);
+    //cannonDebugger = new CannonDebugger(scene, world);
 
     //===================================================================
     // BUILDING THE SCENE
@@ -533,6 +533,7 @@ function onMouseClick(event) {
                     world.addBody(convexBody);
 
                     gems.push({mesh: convexMesh, body: convexBody});
+                    showWin = convexMesh;
                 }
             }
         }
@@ -597,7 +598,7 @@ function animate() {
     // Move the robot
     robotMovement();
     // Update cannon-es-debugger
-    cannonDebugger.update();
+    //cannonDebugger.update();
     // Rotate guns
     pickableObjects.forEach( (gun) => {
         gun.rotation.y += 0.01;
@@ -638,7 +639,10 @@ function updatePhysics() {
     gems.forEach((gem) => {
         gem.mesh.position.copy(gem.body.position);
         gem.mesh.quaternion.copy(gem.body.quaternion);
-        if (gem.body.position.y < 0.5) document.getElementById("win").innerHTML = ""; 
+        if (gem.mesh == showWin && gem.body.position.y < 0.5) {
+            document.getElementById("win").innerHTML = "";
+            showWin = null;
+        }
     });
 }
 
@@ -983,10 +987,10 @@ function spawnEnemy() {
     robotBody = new CANNON.Body({
         mass: 20,
         shape: new CANNON.Sphere(2.5),
-        position: new CANNON.Vec3(0, 5, 0),
+        position: new CANNON.Vec3(-2, 5, 0),
         material: robotPhysMat
     });
-    robotBody.quaternion.setFromEuler(0, .7*Math.PI, 0);
+    robotBody.quaternion.setFromEuler(0, .9*Math.PI, 0);
     world.addBody(robotBody);
 
     // Air resistance
