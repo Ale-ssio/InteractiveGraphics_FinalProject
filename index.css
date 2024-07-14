@@ -3,6 +3,7 @@ body {
     overflow: hidden;
 }
 
+/*Two transparent circles with border at the center of the screen*/
 #crosshair-out {
     position: absolute;
     top: 50%;
@@ -29,6 +30,7 @@ body {
     pointer-events: none;
 }
 
+/*Rectangular yellow div initially invisible, shown only when R is pressed*/
 #reloading {
     position: fixed;
     top: 50%;
@@ -44,6 +46,7 @@ body {
     visibility: hidden;
 }
 
+/*Rectangular menù shown when Esc is pressed, opacity reduces, background blurred*/
 #pause {
     position: absolute;
     top: 50%;
@@ -61,6 +64,7 @@ body {
     visibility: hidden;
 }
 
+/*Tutorial menu, made hidden after clicking on the screen*/
 #tutorial {
     position: absolute;
     top: 50%;
@@ -81,6 +85,7 @@ body {
     padding: 20px;
 }
 
+/*Class of the submenus, to contain text in the center. Flexbox to align them in the corners*/
 .corner {
     width: 45%;
     height: 45%;
@@ -100,6 +105,7 @@ body {
     margin: 10px 0;
 }
 
+/*Each submenu aligned to its corner*/
 .corner.top-left {
     align-self: flex-start;
 }
@@ -116,6 +122,7 @@ body {
     align-self: flex-end;
 }
 
+/*Number of bullets, innerHtml modified when shooting/reloading*/
 #bullets {
     position: fixed;
     bottom: 3%;
@@ -125,6 +132,7 @@ body {
     font-weight: bold;
 }
 
+/*Number of coins, innerHtml modified when you pay or gain something*/
 #coins {
     position: fixed;
     color: #1ff2ff;
@@ -133,6 +141,8 @@ body {
     padding-left: 5px;
 }
 
+/*IDs of the divs of the 3 playable guns, each one containing the image of the gun.
+Only the current active gun div is made visible*/
 #pistol {
     position: fixed;
     bottom: 4%;
@@ -153,6 +163,7 @@ body {
     visibility: hidden;
 }
 
+/*Highlight text in the menus*/
 .button {
     color: #ffc000;
 }
