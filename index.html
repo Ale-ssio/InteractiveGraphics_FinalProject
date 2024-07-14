@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="utf-8">
-        <title>Shoot the Cans!</title>
+        <title>Sci-Fi Shooter</title>
         <link rel="Website Icon" type="png" href="./images/icon.png">
         <link rel="stylesheet" href="index.css"/>
 
@@ -10,10 +10,12 @@
     </head>
     <body>
 
+        <!--Show crosshair at the center of the screen-->
         <div id="crosshair-out">
             <div id="crosshair-in"></div>
         </div>
 
+        <!--Show the tutorial screen at the start of the game. Make it invisible when the player clicks to play-->
         <div id="tutorial">
             <div class="corner top-left">
                 <p style="font-weight: bold; font-size: 25px; padding-bottom: 10px;">SCI-FI SHOOTER</p>
@@ -41,22 +43,29 @@
             </div>
         </div>
 
+        <!--Show the pause screen when the user presses Esc to exit the Pointer Lock-->
         <div id="pause">
             <p class="button">PAUSE</p>
             <p style="padding-top: 100px;"><span class="button">Click</span> anywhere to resume</p>
         </div>
 
+        <!--Show that you are reloading a gun for a little time after pressing R-->
         <div id="reloading">RELOADING...</div>
         
+        <!--Show the shadow of the gun you are using in the bottom right corner-->
         <div id="pistol"><img src="images/pistol.png" width="60" height="60" style="padding-right: 5px;"></div>
         <div id="rifle"><img src="images/rifle.png" width="100" height="100" style="padding-right: 5px;"></div>
         <div id="grenade"><img src="images/rocketLauncher.png" width="100" height="100" style="padding-right: 5px;"></div>
         
+        <!--Show the number of coins you currently have in the top left corner-->
         <div style="top: 3%; left: 3%; position: fixed; color: #1ff2ff; font-size: 30px;">
             COINS:
             <span id="coins">0</span>
+            <!--Briefly show the amount of coins you won by spinning the crate-->
             <span style="padding-left: 50px;" id="win"></span>
         </div>
+
+        <!--Show the number of bullets left-->
         <div id="bullets" style="padding-right: 10px;">10</div>
         
         <div id="container"></div>
