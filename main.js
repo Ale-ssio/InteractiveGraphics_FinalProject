@@ -61,7 +61,7 @@ function init() {
     // Scene: set up what you want to render and where
     scene = new THREE.Scene();
 
-    // Camera: create a camera like the human oint of view, set
+    // Camera: create a camera like the human point of view, set
     // the field of view, the aspect ratio and the near/far plane,
     // so define the area you want to look at
     camera = new THREE.PerspectiveCamera(
@@ -75,6 +75,9 @@ function init() {
     // Look (point the camera) slightly above the origin of the scene
     camera.lookAt(0, player.height, 0);
     // Invert rotation axis of the camera to handle rotaion through mouse movement
+    // First I rotate the camera horizontally, then I can rotate it vertically
+    // from the new axes orientation. Without changing the rotation order
+    // the rotation would start move diagonally.
     camera.rotation.order = 'YXZ';
 
     // Renderer: used to display the scene {without polishing}
@@ -147,7 +150,7 @@ function init() {
     directionalLightFolder.open();
 
     //===================================================================
-    // INITIALIZING THE PHYSIC WORLD
+    // INITIALIZING THE PHYSICS WORLD
 
     // Create a physics world with gravity
     world = new CANNON.World({
@@ -169,7 +172,7 @@ function init() {
     // Create both the meshes and the bodies of floor and walls 
     // Also create the invisible planes to insert text
     buildRoom();
-    // Randomly reate both the meshes and the bodies of the obstacles
+    // Randomly create both the meshes and the bodies of the obstacles
     // between the enemy and the falling zone
     buildObstacles();
 
@@ -200,6 +203,8 @@ function init() {
     // In this way the box can be blocked or bounce back, but I don't have the problem
     // of the box horizontally falling down
     playerBody.fixedRotation = true;
+    // Recompute mass properties to handle in a smoother way the collision with obstacles
+    // by stopping right on them, instead of being heavily bounced back
     playerBody.updateMassProperties();
     world.addBody(playerBody);
 
@@ -342,7 +347,7 @@ function onMouseClick(event) {
             var distancez = intersectedObject.position.z - playerBody.position.z;
             
             // If the player is near enough and clicked on an object different from the selected gun
-            if (intersectedObject != selected && distancex <= 15 && distancez <= 15) {
+            if (intersectedObject != selected && distancex <= 20 && distancez <= 20) {
 
                 switch(intersectedObject.name) {
                     // If he clicked on the little gun
@@ -488,8 +493,8 @@ function onMouseClick(event) {
                         // Change the color of the player bullets
                         player.color = color;
 
-                        // Set the geomtry of the convex polygon to icosahedron (20 faces)
-                        convexGeo = new THREE.IcosahedronGeometry(0.5); 
+                        // Set the geometry of the convex polyhedron to octahedron (8 faces)
+                        convexGeo = new THREE.OctahedronGeometry(0.5);
 
                         break;
                     // If the player selected the 2 coins crate
@@ -510,8 +515,8 @@ function onMouseClick(event) {
                         // Reload the guns
                         reloadGuns();
 
-                        // Set the geometry of the convex polyhedron to octahedron (8 faces)
-                        convexGeo = new THREE.OctahedronGeometry(0.5); 
+                        // Set the geometry of the convex polyhedron to dodecahedron (12 faces)
+                        convexGeo = new THREE.DodecahedronGeometry(0.5); 
                         
                         break;
                     // If the player selected the 5 coins crate
@@ -525,11 +530,11 @@ function onMouseClick(event) {
                         // Update the player coins on screen
                         document.getElementById("coins").innerHTML = player.coins;
 
-                        // Set the geometry of the convex polyhedron to dodecahedron (12 faces)
-                        convexGeo = new THREE.DodecahedronGeometry(0.5); 
+                        // Set the geomtry of the convex polygon to icosahedron (20 faces)
+                        convexGeo = new THREE.IcosahedronGeometry(0.5);
 
                         // Generate a random integer win between 0 and 5
-                        var win = Math.floor(Math.random() * 5);
+                        var win = Math.floor(Math.random() * 6);
 
                         // The random color reflects the probability of increasing the win
                         if (pickColor <= 0.4) {
@@ -569,14 +574,22 @@ function onMouseClick(event) {
                     // Add the polyhedron to the scene
                     scene.add(convexMesh);
 
+                    // Create a wireframe for better visualization of the gems
+                    // This is because I'm gonna delete attributes and merge vertices
+                    var wireframe = new THREE.WireframeGeometry(convexGeo);
+                    var line = new THREE.LineSegments(wireframe, new THREE.LineBasicMaterial({color: 0x1ff2ff}));
+                    convexMesh.add(line);
+
                     // Extract vertices from the geometry
-                    // Remove unnecessary attributes
+                    // Remove attributes conflicting with mergeVertices.
+                    // Without normals i just have positions and indices.
                     convexGeo.deleteAttribute('normal');
                     convexGeo.deleteAttribute('uv');
                     // Merge duplicate vertices
                     convexGeo = BufferGeometryUtils.mergeVertices(convexGeo);
 
                     var vertices = [];
+                    // Each vertex is represented by its coordinates (x, y, z) in the position array
                     // For each vertex of the geometry, take the position and add to the array
                     for (let i = 0; i < convexGeo.attributes.position.count; i++) {
                         vertices.push(
@@ -590,6 +603,7 @@ function onMouseClick(event) {
 
                     // Extract faces from the geometry
                     var faces = [];
+                    // Index array defines how the vertices are connected to form triangles (faces)
                     // For each three indices create a triangle and add to the faces array
                     for (let i = 0; i < convexGeo.index.count; i += 3) {
                         faces.push([
@@ -777,6 +791,9 @@ function playerMovement() {
         player.canJump = false;
     }
     // If W key is pressed the player will walk forward
+    // Camera.rotation.y represents the direction towards which the player is looking
+    // Sin and cos return the components of the movement
+    // Lateral movement needs to rotate the looking direction by 90 degrees to be able to move forward and backward
     if (keyboard["KeyW"]) {
         // Move the player body forward as the W key is pressed
         // Aldo diagonal movement is handled
@@ -938,7 +955,7 @@ function buildRoom() {
 
     // Label: to give a name to each area of the map I used some little 
     // planes with special textures, png images of some text without background
-    // Making the plane transparent allows to see ony the 2D written text
+    // Making the plane transparent allows to see only the 2D written text
     // Fight label
     var labelGeo = new THREE.PlaneGeometry(15, 6);
     var texture = new THREE.TextureLoader(loadingManager).load('images/fight.png');
